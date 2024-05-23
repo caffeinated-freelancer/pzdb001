@@ -6,15 +6,18 @@ import pyodbc
 class PzDatabase:
     conn_str: str
     connection: pyodbc.connect
+    debug: bool = False
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, debug: bool = False):
         self.conn_str = f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={db_path}"
         self.connection = pyodbc.connect(self.conn_str)
+        self.debug = debug
 
     def __del__(self):
         # body of destructor
         self.connection.close()
-        print("Connection closed")
+        if self.debug:
+            print("Connection closed")
 
     # def copy_table_structure(self, original_table_name: str, new_table_name: str):
     #     # query = f"CREATE TABLE {new_table_name} LIKE {original_table_name}"
@@ -39,30 +42,42 @@ class PzDatabase:
     #     print(column_names)
     #     print(column_types)
 
-    def perform_update(self, query: str):
+    def perform_update(self, query: str) -> int:
         cursor = self.connection.cursor()
 
-        print(f"Update Query: {query}")
+        if self.debug:
+            print(f"Update Query: {query}")
 
         cursor.execute(query)
+        affected_rows = cursor.rowcount
+        if self.debug:
+            print('affected rows: ', affected_rows)
 
         self.connection.commit()
         cursor.close()
+        return affected_rows
 
-    def prepared_update(self, query: str, callback):
-        print(f"Update Query (prepared statement): {query}")
+    def prepared_update(self, query: str, callback) -> int:
+        if self.debug:
+            print(f"Update Query (prepared statement): {query}")
 
         cursor = self.connection.cursor()
+        counter = 0
 
         for supplier in callback:
             params = supplier()
             cursor.execute(query, params)
+            counter += 1
             # print(params)
 
         self.connection.commit()
 
-        # print("Record updated successfully!")
+        affected_rows = cursor.rowcount
+
+        if self.debug:
+            print(f'{counter} record(s) updated successfully!')
         cursor.close()
+        return affected_rows
 
     def get_column_names(self, query: str) -> List[str]:
         cursor = self.connection.cursor()
