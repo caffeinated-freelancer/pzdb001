@@ -66,8 +66,12 @@ class PzDatabase:
 
         for supplier in callback:
             params = supplier()
-            cursor.execute(query, params)
-            counter += 1
+            # print(params)
+            try:
+                cursor.execute(query, params)
+                counter += 1
+            except pyodbc.IntegrityError:
+                print("Integrity Error", params)
             # print(params)
 
         self.connection.commit()

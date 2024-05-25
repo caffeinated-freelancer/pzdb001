@@ -75,16 +75,31 @@ class PzDbOperation:
         self.pzDb.perform_update(
             f'UPDATE {self.target_table} SET [資料來源] = {data} WHERE IsNull([資料來源])')
 
-    def copy_from_001(self):
+    def copy_member_only_in_001(self):
         print('[*] 從 001 複製初始學員資料')
+        # column_names = self.pzDb.get_column_names(f'SELECT * FROM member001')
+        #
+        # # pz_database.print_query("SELECT * FROM member001")
+        # inserted_column = ",".join([f"[{col}]" for col in column_names])
+        # # pz_database.perform_update(f"INSERT INTO MemberData ({inserted_column},身分證字號,法名) SELECT *,NULL as 身分證字號,NULL as 法名 FROM member001")
+        # rows = self.pzDb.perform_update(
+        #     f'INSERT INTO {self.target_table} ({inserted_column}) SELECT {inserted_column} FROM member001')
+        # self.update_data_come_from('001 - 初始資料')
+        # print(f'>>> {rows} record(s) copied')
+        # print()
+
         column_names = self.pzDb.get_column_names(f'SELECT * FROM member001')
 
         # pz_database.print_query("SELECT * FROM member001")
         inserted_column = ",".join([f"[{col}]" for col in column_names])
+        selected_column = ",".join([f"m.[{col}]" for col in column_names])
         # pz_database.perform_update(f"INSERT INTO MemberData ({inserted_column},身分證字號,法名) SELECT *,NULL as 身分證字號,NULL as 法名 FROM member001")
-        rows = self.pzDb.perform_update(
-            f'INSERT INTO {self.target_table} ({inserted_column}) SELECT {inserted_column} FROM member001')
-        self.update_data_come_from('001 - 初始資料')
+        rows = self.pzDb.perform_update(f'''
+            INSERT INTO {self.target_table} ({inserted_column}) SELECT {selected_column} FROM member001 m
+            LEFT JOIN {self.target_table} ON m.學員編號 = {self.target_table}.學員編號
+            WHERE {self.target_table}.學員編號 IS NULL
+            ''')
+        self.update_data_come_from('001 - 去年資料')
         print(f'>>> {rows} record(s) copied')
         print()
 
@@ -157,6 +172,9 @@ class PzDbOperation:
         ''', '002 - 上課記錄')
         print(f'>>> {rows} record(s) copied')
         print()
+
+    def fix_member_name_from_002(self):
+        pass
 
     def copy_members_only_in_007(self):
         print('[*] 從 (007 - 報到系統) 匯入未匯入的學員資料')
@@ -288,7 +306,7 @@ class PzDbOperation:
                                     print("Warning! ", entry, target_entry)
                                 else:
                                     print("Multiple Match: ", entry, target_entry)
-                                    multiple_ids = ", ".join([m[2] for m in data[e]])
+                                    multiple_ids = ", ".join([m[2] if m[2] is not None else '' for m in data[e]])
                                     multiple_match.append((entry[1], multiple_ids, target_entry[4]))
 
         # print(confidence)
@@ -322,8 +340,49 @@ class PzDbOperation:
         #     self.compare_update_pid_and_birthday(write_back, relax, self.read_data_from_006)
         print()
 
-    def compare_update_phone_numbers_from_006(self):
-        pass
+    def compare_update_contact_info_from_001(self):
+        print(f'[*] 合併聯絡人資料 (來源: 001 - 去年資料)')
+        cols, results = self.pzDb.query(f'''
+            SELECT m.[緊急聯絡人], m.[緊急聯絡人法名], m.[緊急聯絡人稱謂], m.[緊急聯絡人電話],m.[學員編號] FROM member001 m
+            INNER JOIN {self.target_table} t ON m.[學員編號] = t.[學員編號] AND m.[姓名] = t.[姓名]
+            WHERE IsNull(t.[緊急聯絡人]) AND Not IsNull(m.[緊急聯絡人])
+        ''')
+
+        updated_cols = [f'[{c}]=?' for c in cols[:len(cols) - 1]]
+        supplier = (lambda x=x: x for x in results)
+        self.pzDb.prepared_update(f'UPDATE [{self.target_table}] SET {', '.join(updated_cols)} WHERE [學員編號] = ?', supplier)
+        print(f'>>> {len(results)} records updated')
+        print()
+
+    def compare_update_personal_phone_from_001(self):
+        print(f'[*] 合併個人電話資料 (來源: 001 - 去年資料)')
+        cols, results = self.pzDb.query(f'''
+            SELECT m.[行動電話], m.[住家電話], t.[行動電話], t.[住家電話], m.[學員編號] FROM member001 m
+            INNER JOIN {self.target_table} t ON m.[學員編號] = t.[學員編號] AND m.[姓名] = t.[姓名]
+        ''')
+
+        params = []
+        for result in results:
+            value = 0
+            value |= 1 if result[0] is not None else 0
+            value |= 2 if result[1] is not None else 0
+            value |= 4 if result[2] is not None else 0
+            value |= 8 if result[3] is not None else 0
+
+            if value == 1 or value == 2 or value == 3:
+                params.append((result[0], result[1], result[4]))
+            elif value == 6 or value == 7:
+                params.append((result[2], result[1], result[4]))
+            elif value == 9 or value == 11:
+                params.append((result[0], result[3], result[4]))
+
+        updated_cols = [f'[{c}]=?' for c in cols[:2]]
+        # print(params)
+        # print(updated_cols)
+        supplier = (lambda x=x: x for x in params)
+        self.pzDb.prepared_update(f'UPDATE [{self.target_table}] SET {', '.join(updated_cols)} WHERE [學員編號] = ?', supplier)
+        print(f'>>> {len(params)} records updated')
+        print()
 
     def set_null_for_blank_pid_and_dharma_name_in_target(self):
         self.pzDb.perform_update(
@@ -357,14 +416,14 @@ class PzDbOperation:
                     last_pid = current_pid
                     print('>>>', current_pid)
                 print('  ', (result[cols.index('學員編號')],
-                       result[cols.index('姓名')],
-                       result[cols.index('資料來源')],
-                       result[cols.index('法名')],
-                       result[cols.index('出生日期')],
-                       result[cols.index('行動電話')],
-                       result[cols.index('住家電話')],
-                       result[cols.index('緊急聯絡人')],
-                       result[cols.index('備註')]))
+                             result[cols.index('姓名')],
+                             result[cols.index('資料來源')],
+                             result[cols.index('法名')],
+                             result[cols.index('出生日期')],
+                             result[cols.index('行動電話')],
+                             result[cols.index('住家電話')],
+                             result[cols.index('緊急聯絡人')],
+                             result[cols.index('備註')]))
         print()
 
     def target_personal_id_checker(self):
@@ -429,7 +488,7 @@ class PzDbOperation:
                     OR t.[姓名] <> m.[姓名]
                     OR t.[性別] <> m.[性別]
                 ''')
-# --                     OR t.[出生日期] <> m.[出生日期]
+        # --                     OR t.[出生日期] <> m.[出生日期]
         for result in results:
             if result[1] != result[2]:
                 # print("  ", result[0], "(", result[1], "vs", result[2], ")", "(", result[3], ",", result[4], ")", "(", result[5], ",", result[6], ") [", result[cols.index("資料來源")], "]")
@@ -441,6 +500,7 @@ class PzDbOperation:
                 print("  ", result[0], result[1], result[3], "(", result[7], "vs", result[8], ")")
             else:
                 # print("  ", result[0], "(", result[1], ",", result[2], ")", "(", result[3], ",", result[4], ")", "(", result[5], "vs", result[6], ") [", result[cols.index("資料來源")], "]")
-                print("  ", result[0], "(", result[1], ",", result[2], ")", "(", result[3], ",", result[4], ")", "(", result[5], "vs", result[6], ") [", result[cols.index("資料來源")], "]")
+                print("  ", result[0], "(", result[1], ",", result[2], ")", "(", result[3], ",", result[4], ")", "(",
+                      result[5], "vs", result[6], ") [", result[cols.index("資料來源")], "]")
         print(f'>>> 不同 {len(results)} 筆')
         print()
