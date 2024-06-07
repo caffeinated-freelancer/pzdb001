@@ -1,0 +1,40 @@
+# Pz DB 001
+
+mysql:
+  user: 'user'
+  password: 'password'
+  host: 'localhost'
+  database: 'database'
+
+ms_access_db:
+  db_file: "access_database.accdb"
+  target_table: 'MemberData'
+
+google:
+  secret_file: 'google_credential.json'
+  spreadsheets:
+    class_members:
+      semester: '113-1'
+      spreadsheet_id: 'the_spread_sheet_id'
+      sheet_name: 'sheet_name'
+
+excel:
+  templates:
+    introducer:
+      spreadsheet_file: 'spreadsheet_file1.xlsx'
+      header_row: 2
+    senior:
+      spreadsheet_file: 'spreadsheet_file2.xlsx'
+      header_row: 2
+  questionnaire:
+    spreadsheet_file: 'spreadsheet_file3.xlsx'
+    sheet_name: 'sheet_name'
+    header_row: 2
+  new_class_lineup:
+    spreadsheet_file: ''
+    sheet_name: ''
+    header_row: 2
+
+semester: '113_1'
+previous_semester: '112_2'
+output_folder: 'the_output_folder'

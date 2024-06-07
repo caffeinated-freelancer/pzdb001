@@ -1,50 +1,81 @@
-from pz.op import PzDbOperation
+import sys
+from getopt import getopt, GetoptError
 
-# Press the green button in the gutter to run the script.
+from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
+from pz.config import PzProjectConfig
+from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
+from pz_functions.generaters.introducer import generate_introducer_reports
+from pz_functions.generaters.senior import generate_senior_reports
+from pz_functions.importers.mysql_functions import write_data_to_mysql
+from pz_functions.mergers.member_merging import member_data_merging
+from services.excel_workbook_service import ExcelWorkbookService
+
+
+def read_members_from_cloud(spreadsheet_id: str, secret_file: str):
+    PzCloudSpreadsheetMemberService(spreadsheet_id, secret_file)
+
+
+def read_new_members_from_excel(excel_file: str, sheet_name: str):
+    service = ExcelWorkbookService(PzQuestionnaireInfo({}), excel_file, sheet_name, debug=True)
+    service.read_all()
+
+
 if __name__ == '__main__':
-    # Replace with your actual database path
-    db_path = r"C:/Users/Foveo/OneDrive/Documents/db0519.accdb"
+    short_opts = 'hvdc:'
 
-    pzOperation = PzDbOperation(db_path, 'MemberData')
+    long_opts = [
+        "help",
+        "verbose",
+        "debug",
+        "config=",
+        "write-to-mysql",
+        "generate-introducer-reports",
+        "generate-senior-reports"
+    ]
 
-    relax = True
-    rewrite = True
+    try:
+        options, args = getopt(sys.argv[1:], short_opts, long_opts)
+    except GetoptError as err:
+        print(f"Error parsing options: {err}")
+        sys.exit(2)
 
-    if rewrite:
-        pzOperation.clear_target_database()  # 清空資料庫
+    config_file = 'C:/Applications/pzdb001/config.yaml'
+    verbose = False
+    debug = False
+    write_data_to_mysql_flag = False
+    generate_introducer_reports_flag = False
+    generate_senior_reports_flag = False
+    member_data_merging_flag = False
 
-        pzOperation.copy_members_only_in_002()  # 複製僅在 002 上有的資料 (上課記錄)
-        pzOperation.copy_members_only_in_005()  # 複製僅在 005 上有的資料 (112-2 禪修班)
-        pzOperation.copy_member_only_in_001()  # 複製 001 的資料 (去年見羨法師提供的資料)
-        pzOperation.copy_members_only_in_007()  # 複製僅在 002 上有的資料 (5/19 報到系統累積的資料)
+    for opt, arg in options:
+        if opt in ("-h", "--help"):
+            # Display help message
+            print("Help message...")
+            sys.exit()
+        elif opt in ("-v", "--verbose"):
+            verbose = True
+        elif opt in ("-d", "--debug"):
+            debug = True
+        elif opt in ("-c", "--config"):
+            config_file = arg
+        elif opt == "--write-to-mysql":
+            write_data_to_mysql_flag = True
+        elif opt == "--generate-introducer-reports":
+            generate_introducer_reports_flag = True
+        elif opt == "--generate-senior-reports":
+            generate_senior_reports_flag = True
+        else:
+            print(f"Unknown option: {opt}")
+            sys.exit(2)
 
-        pzOperation.copy_dharma_name_from_002()  # 複製 002 的法名
-        pzOperation.copy_dharma_name_from_005()  # 複製 005 的法名
-        pzOperation.copy_dharma_name_from_007()  # 複製 007 的法名
+    cfg = PzProjectConfig.from_yaml(config_file)
 
-        # 補資料: 003, 004, 006 缺學號, 所以用姓名比對補 [身分證字號], [出生日期]
-        pzOperation.compare_update_pid_and_birthday(True, relax, '003 - 保險資料',
-                                                    pzOperation.read_and_index_by_name_from_003)
-        pzOperation.compare_update_pid_and_birthday(True, relax, '004 - 保險資料',
-                                                    pzOperation.read_and_index_by_name_from_004)
-
-        # 普高的身分證號資料有問題
-        pzOperation.compare_update_pid_and_birthday(True, relax, '006 - 普高資料',
-                                                    pzOperation.read_and_index_by_name_from_006)
-
-        pzOperation.compare_update_contact_info_from_001()
-        pzOperation.compare_update_personal_phone_from_001()
-        # pzOperation.compare_update_pid_and_birthday_from_006(True, relax)
-
-        pzOperation.set_null_for_blank_pid_and_dharma_name_in_target()
-
-    pzOperation.pid_and_gender_checker()
-    pzOperation.target_personal_id_checker()
-    pzOperation.check_pid_unique_in_target()
-
-    pzOperation.compare_with_008_more_data()
-    pzOperation.compare_with_008_less_data()
-    pzOperation.compare_with_008_different_data()
-    # pzOperation.read_data_from_006()
-
-    # pzOperation.compare_update_contact_info_from_001()
+    if write_data_to_mysql_flag:
+        write_data_to_mysql(cfg)
+    elif generate_introducer_reports_flag:
+        generate_introducer_reports(cfg)
+    elif generate_senior_reports_flag:
+        generate_senior_reports(cfg)
+    elif member_data_merging_flag:
+        member_data_merging(cfg.ms_access_db.db_file, cfg.ms_access_db.target_table)
+        # read_merging_data(cfg.ms_access_db.db_file, cfg.ms_access_db.target_table)

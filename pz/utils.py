@@ -26,3 +26,66 @@ def personal_id_verification(id_number: str, debug: bool = False) -> bool:
         print(id_number, numeric_id, weights, total)
 
     return total % 10 == 0
+
+
+def full_name_to_real_name(name: str) -> str:
+    if name is not None:
+        match = re.match(r'(.*)\s*\(.*', name)
+        if match:
+            return match.group(1)
+    return name
+
+
+def full_name_to_names(name: str) -> tuple[str, str]:
+    if name is not None:
+        matched = re.match(r'(.*)\s*\((.*)\)', name)
+
+        if matched:
+            return matched.group(1), matched.group(2)
+    
+    return name, ""
+
+
+def normalize_phone_number(phone_number: str) -> tuple[str | None, bool]:
+    if phone_number is None:
+        return None, False
+
+    phone_number = phone_number.strip()
+
+    if phone_number == '' or phone_number == '-':
+        return None, False
+
+    if phone_number in ['未提供', '無', '勿打宅電', '海外居士', '沒電話']:
+        return phone_number, False
+
+    if re.match(r'09\d{2}-\d{6}', phone_number):
+        return phone_number, True
+    elif re.match(r'0\d{2,3}-\d{7,84}', phone_number):
+        return phone_number, True
+
+    match = re.match(r'(09\d{2})(\d{6})', phone_number)
+    if match:
+        return f'{match.group(1)}-{match.group(2)}', True
+
+    match = re.match(r'(\d{2,3})\s*-\s*(\d{6,7})', phone_number)
+    if match:
+        return f'{match.group(1)}-{match.group(2)}', True
+
+    match = re.match(r'(09\d{2})-(\d{3})-(\d{3})', phone_number)
+    if match:
+        return f'{match.group(1)}-{match.group(2)}{match.group(3)}', True
+
+    match = re.match(r'(09\d{2})-(\d{2})(\d{6})', phone_number)
+    if match:
+        return f'{match.group(1)}{match.group(2)}-{match.group(3)}', True
+
+    match = re.match(r'(0[234567])(\d{7,8})', phone_number)
+    if match:
+        return f'{match.group(1)}-{match.group(2)}', True
+
+    match = re.match(r'(0[234567])\s*-+\s*(\d{7})', phone_number)
+    if match:
+        return f'{match.group(1)}-{match.group(2)}', True
+
+    # print(phone_number)
+    return phone_number, False

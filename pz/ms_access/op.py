@@ -3,8 +3,8 @@ from typing import List, Any, Callable
 
 import pyodbc
 
-from pz.db import PzDatabase
-from pz.utils import personal_id_verification
+from pz.ms_access.db import PzDatabase
+from pz.utils import personal_id_verification, normalize_phone_number
 
 
 class PzDbOperation:
@@ -108,7 +108,7 @@ class PzDbOperation:
 
         result_list = PzDbOperation.fix_chinese_name_in_results(results)
 
-        supplier = (lambda x=x: x for x in result_list)
+        supplier = (lambda y=x: x for x in result_list)
 
         query = f'INSERT INTO {self.target_table} ({",".join(cols)}) VALUES ({",".join(["?"] * len(cols))})'
 
@@ -119,7 +119,7 @@ class PzDbOperation:
 
     def copy_dharma_name(self, query: str) -> int:
         _, results = self.pzDb.query(query)
-        supplier = (lambda x=x: x for x in results)
+        supplier = (lambda y=x: x for x in results)
         self.pzDb.prepared_update(f'UPDATE [{self.target_table}] SET [法名] = ? WHERE [學員編號] = ?', supplier)
         return len(results)
 
@@ -316,21 +316,21 @@ class PzDbOperation:
 
         if write_back:
             if len(confidence) > 0:
-                supplier = (lambda x=x: x for x in confidence)
+                supplier = (lambda y=x: x for x in confidence)
 
                 self.pzDb.prepared_update(
                     f'UPDATE {self.target_table} SET [性別] = ?, [身分證字號] = ?, [備註] = ? WHERE [學員編號] = ?',
                     supplier)
 
             if relax and len(relax_entries) > 0:
-                supplier = (lambda x=x: x for x in relax_entries)
+                supplier = (lambda y=x: x for x in relax_entries)
 
                 self.pzDb.prepared_update(
                     f'UPDATE {self.target_table} SET [性別] = ?, [身分證字號] = ?, [出生日期] = ?, [備註] =?    WHERE [學員編號] = ?',
                     supplier)
 
             # if len(possible) > 0:
-            #     supplier = (lambda x=x: x for x in possible)
+            #     supplier = (lambda y=x: x for x in possible)
             #
             #     self.pzDb.prepared_update(
             #         f'UPDATE {self.target_table} SET [性別] = ?, [鬆散身分證字號] = ?, [鬆散出生日期] = ?, [備註] =?  WHERE [學員編號] = ?',
@@ -349,39 +349,131 @@ class PzDbOperation:
         ''')
 
         updated_cols = [f'[{c}]=?' for c in cols[:len(cols) - 1]]
-        supplier = (lambda x=x: x for x in results)
-        self.pzDb.prepared_update(f'UPDATE [{self.target_table}] SET {', '.join(updated_cols)} WHERE [學員編號] = ?', supplier)
+        supplier = (lambda y=x: x for x in results)
+        self.pzDb.prepared_update(f'UPDATE [{self.target_table}] SET {', '.join(updated_cols)} WHERE [學員編號] = ?',
+                                  supplier)
         print(f'>>> {len(results)} records updated')
         print()
 
-    def compare_update_personal_phone_from_001(self):
-        print(f'[*] 合併個人電話資料 (來源: 001 - 去年資料)')
-        cols, results = self.pzDb.query(f'''
-            SELECT m.[行動電話], m.[住家電話], t.[行動電話], t.[住家電話], m.[學員編號] FROM member001 m
-            INNER JOIN {self.target_table} t ON m.[學員編號] = t.[學員編號] AND m.[姓名] = t.[姓名]
-        ''')
+    def compare_and_update_personal_phone_number(self, query: str):
+        cols, results = self.pzDb.query(query)
+
+        cols = cols[:len(cols) - 1]
 
         params = []
+        valid = [False, False, False, False]
         for result in results:
-            value = 0
-            value |= 1 if result[0] is not None else 0
-            value |= 2 if result[1] is not None else 0
-            value |= 4 if result[2] is not None else 0
-            value |= 8 if result[3] is not None else 0
+            for i in range(4):
+                result[i], valid[i] = normalize_phone_number(result[i])
 
-            if value == 1 or value == 2 or value == 3:
-                params.append((result[0], result[1], result[4]))
-            elif value == 6 or value == 7:
-                params.append((result[2], result[1], result[4]))
-            elif value == 9 or value == 11:
-                params.append((result[0], result[3], result[4]))
+            param = [None, None, result[4]]
+            modified = False
+
+            if result[0] is not None:
+                if result[2] is not None:
+                    if valid[2]:
+                        param[0] = result[2]
+                    elif valid[0]:
+                        param[0] = result[0]
+                        modified = True
+                else:
+                    param[0] = result[0]
+                    modified = True
+            else:
+                param[0] = result[2]
+
+            if result[1] is not None:
+                if result[3] is not None:
+                    if valid[3]:
+                        param[1] = result[3]
+                    elif valid[1]:
+                        param[1] = result[1]
+                        modified = True
+                else:
+                    param[1] = result[1]
+                    modified = True
+            else:
+                param[1] = result[3]
+
+            if modified:
+                params.append(tuple(param))
+
+            # value = 0
+            # value |= 1 if result[0] is not None else 0  # new value store in 0 and 1
+            # value |= 2 if result[1] is not None else 0
+            # value |= 4 if result[2] is not None else 0  # origin value store in 2 and 3
+            # value |= 8 if result[3] is not None else 0
+            #
+            # if 1 <= value <= 3:
+            #     params.append((result[0], result[1], result[4]))
+            # elif 5 <= value <= 7:
+            #     if value != 6 and result[0] != result[2]:
+            #         print(result[4], result[5], " (mobile):", result[0], "vs", result[2], "(in-db)")
+            #         if valid[2] and not valid[0]:
+            #             params.append((result[2], result[1], result[4]))
+            #     if value == 6 or value == 7:
+            #         params.append((result[2], result[1], result[4]))
+            # elif 9 <= value <= 11:
+            #     if value != 9 and result[1] != result[3]:
+            #         print(result[4], result[5], " (home):", result[1], "vs", result[3], "(in-db)")
+            #     params.append((result[0], result[3], result[4]))
+            # else:
+            #     if (value & 1) == 1 and result[0] != result[2]:
+            #         print(result[4], result[5], " (mobile):", result[0], "vs", result[2], "(in-db)")
+            #     if (value & 2) == 2 and result[1] != result[3]:
+            #         print(result[4], result[5], " (home):", result[1], "vs", result[3], "(in-db)")
 
         updated_cols = [f'[{c}]=?' for c in cols[:2]]
         # print(params)
         # print(updated_cols)
-        supplier = (lambda x=x: x for x in params)
-        self.pzDb.prepared_update(f'UPDATE [{self.target_table}] SET {', '.join(updated_cols)} WHERE [學員編號] = ?', supplier)
-        print(f'>>> {len(params)} records updated')
+        supplier = (lambda y=x: x for x in params)
+        self.pzDb.prepared_update(f'UPDATE [{self.target_table}] SET {', '.join(updated_cols)} WHERE [學員編號] = ?',
+                                  supplier)
+        print(f'>>> {len(params)} record(s) updated, {len(results)} joined record(s)')
+        print()
+
+    def compare_update_personal_phone_from_005(self):
+        print(f'[*] 合併個人電話資料 (來源: 005 - 112-2 禪修班)')
+
+        self.compare_and_update_personal_phone_number(f'''
+                    SELECT m.[手機] AS 行動電話, m.[住宅] AS 住家電話, t.[行動電話], t.[住家電話], m.[學員編號], t.[姓名] FROM member005 m
+                    INNER JOIN {self.target_table} t ON m.[學員編號] = t.[學員編號] AND m.[學員姓名] = t.[姓名]
+                ''')
+
+    def compare_update_personal_phone_from_001(self):
+        print(f'[*] 合併個人電話資料 (來源: 001 - 去年資料)')
+
+        self.compare_and_update_personal_phone_number(f'''
+            SELECT m.[行動電話], m.[住家電話], t.[行動電話], t.[住家電話], m.[學員編號], t.[姓名] FROM member001 m
+            INNER JOIN {self.target_table} t ON m.[學員編號] = t.[學員編號] AND m.[姓名] = t.[姓名]
+        ''')
+
+    def compare_update_personal_phone_from_006(self):
+        # 006 - 普高資料
+        print(f'[*] 合併個人電話資料 (來源: 006 - 普高資料)')
+        self.compare_and_update_personal_phone_number(f'''
+                    SELECT m.[行動] AS 行動電話, m.[住宅電] AS 住家電話, t.[行動電話], t.[住家電話], m.[學員編號], t.[姓名] FROM member006 m
+                    INNER JOIN {self.target_table} t ON m.[身份証號] = t.[身分證字號] AND m.[姓名] = t.[姓名]
+                ''')
+
+    def compare_update_contact_info_from_006(self):
+        # 006 - 普高資料
+        # cols = self.pzDb.get_column_names('select * from member006')
+        # 'ID', '身份証號', '中台編號', '學員編號', '姓名', 'Field5', '法名', 'Field7', '新增月刊', '新增通啟', '性別', '現齡', '出生日', '地址', '住宅電', '公司電', '行動', '畢校&科系', '工作&職稱', '介紹人', 'E-mail', '特殊專長', '身心狀況', '出生地', '備註', '精舍信眾編號', '緊急連絡人', '連絡人關係', '連絡人電話', '家屬碼', '介紹人/關係', '建檔日期', '受戒別', '發心項目', '親眷關係', '護法會職稱', '班別', '組別']
+
+        print(f'[*] 合併聯絡人資料 (來源: 006 - 普高資料)')
+        # SELECT m.[緊急聯絡人], m.[連絡人關係], m.[連絡人電話], m.[學員編號] FROM member006 m
+        cols, results = self.pzDb.query(f'''
+                    SELECT m.[緊急連絡人] AS 緊急聯絡人, m.[連絡人關係] AS 緊急聯絡人稱謂, m.[連絡人電話] AS 緊急聯絡人電話, m.[學員編號] FROM member006 m
+                    INNER JOIN {self.target_table} t ON m.[學員編號] = t.[學員編號] AND m.[姓名] = t.[姓名]
+                    WHERE IsNull(t.[緊急聯絡人]) AND Not IsNull(m.[緊急連絡人])
+                ''')
+        #
+        # updated_cols = [f'[{c}]=?' for c in cols[:len(cols) - 1]]
+        # supplier = (lambda x=x: x for x in results)
+        # self.pzDb.prepared_update(f'UPDATE [{self.target_table}] SET {', '.join(updated_cols)} WHERE [學員編號] = ?',
+        #                           supplier)
+        print(f'>>> {len(results)} new record(s) found')
         print()
 
     def set_null_for_blank_pid_and_dharma_name_in_target(self):
@@ -504,3 +596,6 @@ class PzDbOperation:
                       result[5], "vs", result[6], ") [", result[cols.index("資料來源")], "]")
         print(f'>>> 不同 {len(results)} 筆')
         print()
+
+    def read_all_from_target(self) -> tuple[list[str], list[pyodbc.Row]]:
+        return self.pzDb.query(f'SELECT * FROM {self.target_table}')

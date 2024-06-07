@@ -1,17 +1,28 @@
-from typing import List
+from typing import Any
 
-import pyodbc
+import mysql.connector
+from mysql.connector.abstracts import MySQLConnectionAbstract
+from mysql.connector.pooling import PooledMySQLConnection
+
+from pz.config import PzProjectMySqlConfig
 
 
-class PzDatabase:
-    conn_str: str
-    connection: pyodbc.connect
+class PzMysqlDatabase:
+    connection: PooledMySQLConnection | MySQLConnectionAbstract
     debug: bool = False
 
-    def __init__(self, db_path: str, debug: bool = False):
-        self.conn_str = f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={db_path}"
-        self.connection = pyodbc.connect(self.conn_str)
+    def __init__(self, cfg: PzProjectMySqlConfig, debug: bool = False):
         self.debug = debug
+
+        db_config = {
+            'user': cfg.user,
+            'password': cfg.password,
+            'host': cfg.host,
+            'database': cfg.database,
+            'raise_on_warnings': True
+        }
+
+        self.connection = mysql.connector.connect(**db_config)
 
     def __del__(self):
         # body of destructor
@@ -70,8 +81,8 @@ class PzDatabase:
             try:
                 cursor.execute(query, params)
                 counter += 1
-            except pyodbc.IntegrityError:
-                print("Integrity Error", params)
+            except Exception as e:
+                print(e, params)
             # print(params)
 
         self.connection.commit()
@@ -83,14 +94,14 @@ class PzDatabase:
         cursor.close()
         return affected_rows
 
-    def get_column_names(self, query: str) -> List[str]:
+    def get_column_names(self, query: str) -> list[str]:
         cursor = self.connection.cursor()
         cursor.execute(query)
         des = [col[0] for col in cursor.description]
         cursor.close()
         return des
 
-    def query(self, query: str) -> tuple[List[str], List[pyodbc.Row]]:
+    def query(self, query: str) -> tuple[list[str], list[Any]]:
         cursor = self.connection.cursor()
         cursor.execute(query)
         column_names = [col[0] for col in cursor.description]
