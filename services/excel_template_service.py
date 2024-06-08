@@ -14,7 +14,7 @@ class ExcelTemplateService:
     header_row: int
 
     def __init__(self, model: ExcelModelInterface, template_spreadsheet: PzProjectExcelSpreadsheetConfig,
-                 target_folder: str, debug: bool = False):
+                 source_file_name: str, target_folder: str, debug: bool = False):
         if not os.path.exists(target_folder):
             raise FileNotFoundError(target_folder)
 
@@ -22,7 +22,7 @@ class ExcelTemplateService:
         self.target_folder = target_folder
 
         # Define the source and destination paths
-        self.destination_path = f'{target_folder}/output-{os.path.basename(self.template_file)}'
+        self.destination_path = f'{target_folder}/output-{os.path.basename(source_file_name)}'
 
         # Copy the file
         # shutil.copyfile(template_file, destination_path)

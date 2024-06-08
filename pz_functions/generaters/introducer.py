@@ -1,4 +1,5 @@
 import functools
+import glob
 from collections import OrderedDict
 from typing import Any
 
@@ -60,8 +61,8 @@ def data_by_class_and_group(a: dict[str, Any], b: dict[str, Any]) -> int:
     return 0
 
 
-def generate_introducer_reports(cfg: PzProjectConfig):
-    member_service = PzGrandMemberService(cfg, from_access=False, from_google=False)
+def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProjectConfig, spreadsheet_file: str):
+    # member_service = PzGrandMemberService(cfg, from_access=False, from_google=False)
 
     # members = member_service.read_member_details_from_mysql()
     # for member in members:
@@ -71,11 +72,11 @@ def generate_introducer_reports(cfg: PzProjectConfig):
     # for entity in entities:
     #     print(entity)
     #
-    service = ExcelWorkbookService(PzQuestionnaireInfo({}), cfg.excel.questionnaire.spreadsheet_file,
+    service = ExcelWorkbookService(PzQuestionnaireInfo({}), spreadsheet_file,
                                    cfg.excel.questionnaire.sheet_name, header_at=cfg.excel.questionnaire.header_row,
                                    debug=True)
     template_service = ExcelTemplateService(PzIntroducerContactForOutput({}), cfg.excel.templates['introducer'],
-                                            cfg.output_folder, debug=True)
+                                            spreadsheet_file, cfg.output_folder, debug=True)
 
     print('--------- Template Headers -------')
     print(template_service.get_headers())
@@ -125,3 +126,15 @@ def generate_introducer_reports(cfg: PzProjectConfig):
 
     supplier = (lambda y=x: x for x in sorted_list)
     template_service.write_data(supplier)
+
+
+def generate_introducer_reports(cfg: PzProjectConfig):
+    member_service = PzGrandMemberService(cfg, from_access=False, from_google=False)
+
+    if cfg.excel.questionnaire.spreadsheet_folder is not None and cfg.excel.questionnaire.spreadsheet_folder != '':
+        files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
+
+        for filename in files:
+            generate_introducer_report(member_service, cfg, filename)
+    else:
+        generate_introducer_report(member_service, cfg, cfg.excel.questionnaire.spreadsheet_file)

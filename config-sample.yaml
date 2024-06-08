@@ -28,6 +28,7 @@ excel:
       header_row: 2
   questionnaire:
     spreadsheet_file: 'spreadsheet_file3.xlsx'
+    spreadsheet_folder: 'path_to_spreadsheet'
     sheet_name: 'sheet_name'
     header_row: 2
   new_class_lineup:

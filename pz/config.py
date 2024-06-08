@@ -68,6 +68,7 @@ class PzProjectGoogleConfig(PzProjectBaseConfig):
 
 class PzProjectExcelSpreadsheetConfig(PzProjectBaseConfig):
     spreadsheet_file: str
+    spreadsheet_folder: str
     sheet_name: str
     header_row: int
 
