@@ -72,16 +72,19 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
     # for entity in entities:
     #     print(entity)
     #
+    notes = cfg.excel.questionnaire.additional_notes
+
+    split_file = False
+    if '按班級拆檔案' in notes and notes['按班級拆檔案']:
+        split_file = True
+
+    on_having_class_note = ''
+    if '已有班級電聯註記' in notes:
+        on_having_class_note = notes['已有班級電聯註記']
+
     service = ExcelWorkbookService(PzQuestionnaireInfo({}), spreadsheet_file,
                                    cfg.excel.questionnaire.sheet_name, header_at=cfg.excel.questionnaire.header_row,
                                    debug=True)
-    template_service = ExcelTemplateService(PzIntroducerContactForOutput({}), cfg.excel.templates['introducer'],
-                                            spreadsheet_file, cfg.output_folder, debug=True)
-
-    print('--------- Template Headers -------')
-    print(template_service.get_headers())
-    print('----------------------------------')
-
     entries: list[PzQuestionnaireInfo] = service.read_all(required_attribute='fullName')
 
     # mapping = {'介紹人': 1, '班別': 2, '組別': 3, '學員姓名': 4, '性別': 5, '報名班別': 6, '茶會/上午': 7,
@@ -90,6 +93,8 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
 
     data = []
 
+    classes_data: dict[str, list[dict[str, Any]]] = {}
+
     for entry in entries:
         if entry.fullName is None:
             continue
@@ -97,13 +102,15 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
         phone_list = [entry.mobilePhone, entry.parentsPhone, entry.homePhone]
         phones = list(OrderedDict.fromkeys(item for item in phone_list if item))
 
+        have_register_class = entry.registerClass is not None and entry.registerClass != ''
+
         # print(entry.to_json())
         datum: dict[str, str | int] = {
             '介紹人': entry.introducerName,
             '學員姓名': entry.fullName,
             '性別': entry.gender,
             '連絡電話': "\n".join(phones),
-            '報名班別': entry.registerClass if entry.registerClass is not None else '',
+            '報名班別': entry.registerClass if have_register_class else '',
             '說明事項': entry.remark,
             '讀經班家長/關係': entry.parents if entry.parents is not None and
                                                 entry.registerClass is not None and
@@ -113,19 +120,50 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
         }
         introducer = member_service.find_one_class_member_by_pz_name(entry.introducerName)
 
+        pz_class_name = ''
+
         if introducer is not None:
             datum['班別'] = introducer.class_name
             datum['組別'] = introducer.class_group
+            pz_class_name = introducer.class_name
         else:
             datum['班別'] = ''
             datum['組別'] = ''
 
-        data.append(datum)
+        if have_register_class:
+            datum['電聯註記'] = on_having_class_note
+        else:
+            datum['電聯註記'] = ''
 
-    sorted_list = sorted(data, key=functools.cmp_to_key(data_by_class_and_group))
+        if split_file:
+            pz_class_name = '-' if pz_class_name == '' else pz_class_name
+            if pz_class_name not in classes_data:
+                classes_data[pz_class_name] = []
 
-    supplier = (lambda y=x: x for x in sorted_list)
-    template_service.write_data(supplier)
+            classes_data[pz_class_name].append(datum)
+        else:
+            data.append(datum)
+
+    if split_file:
+        for pz_class_name in classes_data:
+            class_data = classes_data[pz_class_name]
+
+            sorted_list = sorted(class_data, key=functools.cmp_to_key(data_by_class_and_group))
+
+            template_service = ExcelTemplateService(PzIntroducerContactForOutput({}), cfg.excel.templates['introducer'],
+                                                    spreadsheet_file, cfg.output_folder,
+                                                    f'[介紹人電聯表][{pz_class_name}]', debug=True)
+
+            supplier = (lambda y=x: x for x in sorted_list)
+            template_service.write_data(supplier)
+    else:
+        sorted_list = sorted(data, key=functools.cmp_to_key(data_by_class_and_group))
+
+        template_service = ExcelTemplateService(PzIntroducerContactForOutput({}), cfg.excel.templates['introducer'],
+                                                spreadsheet_file, cfg.output_folder, '[介紹人電聯表]', debug=True)
+
+        supplier = (lambda y=x: x for x in sorted_list)
+        template_service.write_data(supplier)
 
 
 def generate_introducer_reports(cfg: PzProjectConfig):

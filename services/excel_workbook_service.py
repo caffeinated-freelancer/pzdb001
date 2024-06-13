@@ -1,3 +1,5 @@
+import re
+from collections import OrderedDict
 from copy import copy
 from typing import Any
 
@@ -7,13 +9,14 @@ from openpyxl.cell import Cell
 from openpyxl.styles import Font
 from openpyxl.utils import coordinate_to_tuple
 from openpyxl.worksheet.dimensions import RowDimension
+from openpyxl.worksheet.pagebreak import Break
 from openpyxl.worksheet.worksheet import Worksheet
 
 from pz.models.excel_model import ExcelModelInterface
 
 
 class ExcelWorkbookService:
-    headers: dict[str, int]
+    headers: OrderedDict[str, int]
     model: ExcelModelInterface
     headers_rev: dict[Any, Any]
     max_column: int
@@ -21,9 +24,15 @@ class ExcelWorkbookService:
     debug: bool
     wb: Workbook
     header_row: int
+    ignore_parenthesis: bool
+    print_header: bool
 
     def __init__(self, model: ExcelModelInterface, excel_file: str, sheet_name: str | None = None,
-                 header_at: int | None = None, debug: bool = False) -> None:
+                 header_at: int | None = None, ignore_parenthesis: bool = False, debug: bool = False,
+                 print_header: bool = False) -> None:
+        self.ignore_parenthesis = ignore_parenthesis
+        self.print_header = print_header
+
         self.wb = openpyxl.load_workbook(excel_file)
 
         self.debug = debug
@@ -48,7 +57,10 @@ class ExcelWorkbookService:
 
         # print(self.header_row)
 
-        self.headers = {}
+        self.rehash_header()
+
+    def rehash_header(self):
+        self.headers = OrderedDict()
 
         self.headers_rev = {}
         self.max_column = 0
@@ -60,6 +72,10 @@ class ExcelWorkbookService:
                 if isinstance(value, str):
                     value = cell.value.replace('\r', '').replace('\n', '')
                 # print("[", value, "]")
+                if self.ignore_parenthesis:
+                    matched = re.match(r'^\s*(.*\S)\s*\(.*', value)
+                    if matched:
+                        value = matched.group(1)
                 self.headers[value] = colNum
                 self.headers_rev[colNum] = value
                 self.max_column = max(self.max_column, colNum)
@@ -67,11 +83,20 @@ class ExcelWorkbookService:
 
         self.max_column += 1
 
+        if self.print_header:
+            print(f'Header row at: {self.header_row}')
+            for header in self.headers:
+                # print(header, self.headers[header])
+                print(f'\'\': \'{header}\',')
+
+    def add_page_break(self, row: int):
+        self.sheet.row_breaks.append(Break(id=row))
+
     def read_all(self, required_attribute: str | None = None) -> list[ExcelModelInterface]:
         if self.debug:
             print(self.headers)
         infos = []
-        for rowNum in range(self.header_row + 1, self.sheet.max_row, 1):
+        for rowNum in range(self.header_row + 1, self.sheet.max_row + 1, 1):
             item = {}
             for colNum in range(1, self.max_column, 1):
                 if colNum in self.headers_rev:
@@ -149,6 +174,12 @@ class ExcelWorkbookService:
 
     def get_header_row(self) -> int:
         return self.header_row
+
+    def max_column(self) -> int:
+        return self.max_column
+
+    def max_row(self) -> int:
+        return self.sheet.max_row
 
     def save_as(self, filename: str):
         print(f'Save excel workbook as: {filename}')

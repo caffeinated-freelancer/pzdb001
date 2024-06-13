@@ -1,14 +1,25 @@
 import json
+import os
+import re
 from typing import Any, Callable
 
 import yaml
+
+
+class PzProjectConfigGlobal:
+    config: 'PzProjectConfig' = None
 
 
 class PzProjectBaseConfig:
     def __init__(self, variables: dict[str, Any],
                  sub_initializer: Callable[[str, dict[str, Any]], bool] | None = None) -> None:
         for variable, value in variables.items():
-            if isinstance(value, str) or isinstance(value, int):
+            if isinstance(value, str):
+                if variable.endswith('_file') or variable.endswith('_folder'):
+                    self.__setattr__(variable, PzProjectConfigGlobal.config.real_path(value))
+                else:
+                    self.__setattr__(variable, value)
+            elif isinstance(value, int):
                 self.__setattr__(variable, value)
             elif isinstance(value, dict):
                 if sub_initializer is None or not sub_initializer(variable, value):
@@ -67,19 +78,87 @@ class PzProjectGoogleConfig(PzProjectBaseConfig):
 
 
 class PzProjectExcelSpreadsheetConfig(PzProjectBaseConfig):
-    spreadsheet_file: str
-    spreadsheet_folder: str
-    sheet_name: str
-    header_row: int
+    spreadsheet_file: str | None
+    spreadsheet_folder: str | None
+    sheet_name: str | None
+    header_row: int | None
+    ignore_parenthesis: bool
+    data_skip_row: int
+    insert_row_after: int
+    additional_notes: dict[str, Any]
 
     def __init__(self, variables: dict[str, Any]) -> None:
+        self.spreadsheet_file = None
+        self.spreadsheet_folder = None
+        self.additional_notes = {}
+        self.ignore_parenthesis = False
+        self.sheet_name = None
+        self.header_row = None
+        self.data_skip_row = 0
+        self.insert_row_after = 0
+
         super().__init__(variables)
+        if 'additional_notes' in variables and isinstance(variables['additional_notes'], dict):
+            self.additional_notes = variables['additional_notes']
+
+        if 'ignore_parenthesis' in variables and isinstance(variables['ignore_parenthesis'], bool):
+            self.ignore_parenthesis = variables['ignore_parenthesis']
+
+
+class PzProjectGraduationStandard:
+    weeks: int
+    expressions: list[str]
+
+    def __init__(self, weeks: int, variables: list[str]) -> None:
+        self.weeks = weeks
+        self.expressions = []
+        for variable in variables:
+            self.expressions.append(variable)
+
+    def calculate(self, counters: dict[str, int]) -> bool:
+        graduate = True
+        for expression in self.expressions:
+            for key, value in counters.items():
+                expression = expression.replace(key, str(value))
+            graduate = graduate and eval(expression)
+        return graduate
+
+
+class PzProjectGraduationConfig(PzProjectBaseConfig):
+    records: PzProjectExcelSpreadsheetConfig
+    standards: PzProjectExcelSpreadsheetConfig
+    template: PzProjectExcelSpreadsheetConfig
+    graduation_standards: dict[int, PzProjectGraduationStandard]
+
+    def __init__(self, variables: dict[str, Any]):
+        self.graduation_standards = {}
+        super().__init__(variables, self.variable_initializer)
+
+    def variable_initializer(self, variable: str, value: Any) -> bool:
+        if variable == 'records':
+            self.records = PzProjectExcelSpreadsheetConfig(value)
+        elif variable == 'standards':
+            self.standards = PzProjectExcelSpreadsheetConfig(value)
+        elif variable == 'template':
+            self.template = PzProjectExcelSpreadsheetConfig(value)
+        elif variable == 'graduation_standards':
+            if isinstance(value, dict):
+                for name, settings in value.items():
+                    if re.match(r'\d+', name):
+                        self.graduation_standards[int(name)] = PzProjectGraduationStandard(int(name), settings)
+        else:
+            return False
+        return True
+
+    def get_graduation_standard(self, week: int) -> PzProjectGraduationStandard | None:
+        return self.graduation_standards[week] if week in self.graduation_standards else None
 
 
 class PzProjectExcelConfig(PzProjectBaseConfig):
     questionnaire: PzProjectExcelSpreadsheetConfig
     new_class_lineup: PzProjectExcelSpreadsheetConfig
     templates: dict[str, PzProjectExcelSpreadsheetConfig]
+    graduation: PzProjectGraduationConfig
 
     def __init__(self, variables: dict[str, Any]) -> None:
         self.templates = {}
@@ -90,6 +169,8 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
             self.questionnaire = PzProjectExcelSpreadsheetConfig(value)
         elif variable == 'new_class_lineup':
             self.new_class_lineup = PzProjectExcelSpreadsheetConfig(value)
+        elif variable == 'graduation':
+            self.graduation = PzProjectGraduationConfig(value)
         elif variable == 'templates':
             if isinstance(value, dict):
                 for k, v in value.items():
@@ -100,26 +181,25 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
 
 
 class PzProjectConfig(PzProjectBaseConfig):
-    ATTRIBUTES = [
-        'access_db_filename',
-        'access_db_target_table',
-        'google_member_spreadsheet_id',
-        'google_secret_file',
-        'introducer_template_file',
-        'output_folder',
-        'introducer_input',
-        'introducer_sheet_name',
-    ]
-
+    workspace: str
+    template_folder: str
+    output_folder: str
     mysql: PzProjectMySqlConfig
     ms_access_db: PzProjectMsAccessConfig
     google: PzProjectGoogleConfig
     excel: PzProjectExcelConfig
-    output_folder: str
     semester: str
     previous_semester: str
 
     def __init__(self, variables: dict[str, Any]) -> None:
+        if 'workspace' in variables:
+            self.workspace = self.real_path(variables['workspace'])
+            variables.pop('workspace')
+
+        if 'template_folder' in variables:
+            self.template_folder = self.real_path(variables['template_folder'])
+            variables.pop('template_folder')
+        PzProjectConfigGlobal.config = self
         super().__init__(variables, self.variable_initializer)
 
     def variable_initializer(self, variable: str, value: Any) -> bool:
@@ -134,6 +214,15 @@ class PzProjectConfig(PzProjectBaseConfig):
         else:
             return False
         return True
+
+    def make_sure_output_folder_exists(self):
+        if not os.path.exists(self.output_folder):
+            # Create the folder if it doesn't exist
+            os.makedirs(self.output_folder)
+            print(f"Folder '{self.output_folder}' created successfully!")
+
+    def explorer_output_folder(self):
+        os.startfile(self.output_folder)
 
     @classmethod
     def from_yaml(cls, filename) -> 'PzProjectConfig':
@@ -150,3 +239,20 @@ class PzProjectConfig(PzProjectBaseConfig):
         #     raise ValueError("Invalid database data format")
 
         # Create the class object and assign validated values
+
+    def real_path(self, file_path: str) -> str:
+        matched = re.match(r'^(.*){([A-Z]+)}(.*)', file_path)
+
+        if matched:
+            if 'WORKSPACE' == matched.group(2):
+                # print(f'{matched.group(1)}{self.workspace}{matched.group(3)}')
+                return f'{matched.group(1)}{self.workspace}{matched.group(3)}'
+            elif 'TEMPLATE' == matched.group(2):
+                return f'{matched.group(1)}{self.template_folder}{matched.group(3)}'
+            return self.real_path(f'{matched.group(1)}{os.getenv(matched.group(2))}{matched.group(3)}')
+
+        matched = re.match(r'^[A-Za-z]:.*', file_path)
+        if matched:
+            return file_path
+        else:
+            return os.path.join(self.workspace, file_path)

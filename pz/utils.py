@@ -1,3 +1,4 @@
+import os
 import re
 
 
@@ -42,7 +43,7 @@ def full_name_to_names(name: str) -> tuple[str, str]:
 
         if matched:
             return matched.group(1), matched.group(2)
-    
+
     return name, ""
 
 
@@ -89,3 +90,37 @@ def normalize_phone_number(phone_number: str) -> tuple[str | None, bool]:
 
     # print(phone_number)
     return phone_number, False
+
+
+def tuple_to_coordinate(row, col):
+    """Converts a (row, column) tuple to its corresponding Excel coordinate,
+       supporting columns beyond XFD (maximum column)."""
+    if not isinstance(row, int) or not isinstance(col, int):
+        raise ValueError("Row and column must be integers.")
+    if row <= 0 or col <= 0:
+        raise ValueError("Row and column must be positive integers.")
+
+    base_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    second_letters = base_letters * 26  # Double the alphabet for columns beyond Z
+
+    col_letter = ""
+    # Handle columns up to 'Z' (base_letters)
+    while col > len(base_letters):
+        col, remainder = divmod(col - 1, len(base_letters))
+        col_letter = base_letters[remainder] + col_letter
+
+    # Handle columns beyond 'Z' (second_letters)
+    while col > 0:
+        col, remainder = divmod(col - 1, 26)
+        col_letter = second_letters[remainder] + col_letter
+
+    # Combine and return the Excel coordinate
+    return col_letter + str(row)
+
+
+# # Example usage with a column larger than 26
+# row = 7
+# col = 32  # Corresponds to "AD"
+
+def explorer_folder(folder: str):
+    os.startfile(folder)

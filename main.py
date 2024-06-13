@@ -1,14 +1,19 @@
 import sys
 from getopt import getopt, GetoptError
+from PyQt6.QtWidgets import (
+    QApplication,
+)
 
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
 from pz.config import PzProjectConfig
 from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
+from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
 from pz_functions.generaters.senior import generate_senior_reports
 from pz_functions.importers.mysql_functions import write_data_to_mysql
 from pz_functions.mergers.member_merging import member_data_merging
 from services.excel_workbook_service import ExcelWorkbookService
+from ui.windows_gui import PyPzWindows
 
 
 def read_members_from_cloud(spreadsheet_id: str, secret_file: str):
@@ -30,7 +35,8 @@ if __name__ == '__main__':
         "config=",
         "write-to-mysql",
         "generate-introducer-reports",
-        "generate-senior-reports"
+        "generate-senior-reports",
+        "generate-graduation-reports",
     ]
 
     try:
@@ -45,6 +51,7 @@ if __name__ == '__main__':
     write_data_to_mysql_flag = False
     generate_introducer_reports_flag = False
     generate_senior_reports_flag = False
+    generate_graduation_reports_flag = False
     member_data_merging_flag = False
 
     for opt, arg in options:
@@ -64,6 +71,8 @@ if __name__ == '__main__':
             generate_introducer_reports_flag = True
         elif opt == "--generate-senior-reports":
             generate_senior_reports_flag = True
+        elif opt == "--generate-graduation-reports":
+            generate_graduation_reports_flag = True
         else:
             print(f"Unknown option: {opt}")
             sys.exit(2)
@@ -79,3 +88,27 @@ if __name__ == '__main__':
     elif member_data_merging_flag:
         member_data_merging(cfg.ms_access_db.db_file, cfg.ms_access_db.target_table)
         # read_merging_data(cfg.ms_access_db.db_file, cfg.ms_access_db.target_table)
+    elif generate_graduation_reports_flag:
+        generate_graduation_reports(cfg)
+    else:
+        app = QApplication([])
+        # window = QWidget()
+        # window.setWindowTitle("普中資料管理程式")
+        # window.setGeometry(100, 100, 580, 680)
+        #
+        # layout = QHBoxLayout()
+        #
+        # button = QPushButton("產生結業報表")
+        # button.clicked.connect(partial(generate_graduation_reports, cfg))
+        #
+        # layout.addWidget(button)
+        # layout.addWidget(QPushButton("Center"))
+        # layout.addWidget(QPushButton("Right"))
+        # window.setLayout(layout)
+        #
+        # window.show()
+        # sys.exit(app.exec())
+
+        window = PyPzWindows(cfg)
+        window.show()
+        sys.exit(app.exec())

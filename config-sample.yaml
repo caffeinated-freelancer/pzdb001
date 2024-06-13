@@ -1,5 +1,20 @@
 # Pz DB 001
 
+# 資料根目錄
+workspace: '{USERPROFILE}\Desktop\來源資料'
+
+# 輸出結果的資料夾
+output_folder: '{USERPROFILE}\Desktop\程式產出資料夾'
+
+# 輸出樣版
+template_folder: '{WORKSPACE}\輸出樣本及參數設定'
+
+# 本學期
+semester: '113_1'
+# 上學期
+previous_semester: '112_2'
+
+
 mysql:
   user: 'user'
   password: 'password'
@@ -35,7 +50,3 @@ excel:
     spreadsheet_file: ''
     sheet_name: ''
     header_row: 2
-
-semester: '113_1'
-previous_semester: '112_2'
-output_folder: 'the_output_folder'
