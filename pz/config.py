@@ -181,6 +181,7 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
 
 
 class PzProjectConfig(PzProjectBaseConfig):
+    config_filename: str
     workspace: str
     template_folder: str
     output_folder: str
@@ -191,7 +192,8 @@ class PzProjectConfig(PzProjectBaseConfig):
     semester: str
     previous_semester: str
 
-    def __init__(self, variables: dict[str, Any]) -> None:
+    def __init__(self, filename: str, variables: dict[str, Any]) -> None:
+        self.config_filename = filename
         if 'workspace' in variables:
             self.workspace = self.real_path(variables['workspace'])
             variables.pop('workspace')
@@ -228,7 +230,7 @@ class PzProjectConfig(PzProjectBaseConfig):
     def from_yaml(cls, filename) -> 'PzProjectConfig':
         with open(filename, 'r', encoding='utf-8') as file:
             config_data = yaml.safe_load(file)
-            return cls(config_data)
+            return cls(filename, config_data)
 
         # Validation and type conversion (replace with your logic)
         # server_data = config_data.get("server", {})
