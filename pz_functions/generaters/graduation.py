@@ -81,21 +81,70 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                 sheet.cell(template_service.header_row + 1, template_header[idx]).value = day
                 date2index[day] = idx
 
-        records: list[AttendRecord] = records_excel.read_all(required_attribute='studentId')
+        raw_records: list[AttendRecord] = records_excel.read_all(required_attribute='studentId')
         data = []
-        vacations = set()
+        vacations: dict[str, int] = {}
+        blank_days: dict[str, int] = {}
+        last_group = -1
+        group_serial_no = 0
+        records: list[AttendRecord] = []
 
-        for record in records:
+        for record in raw_records:
             if record.realName.startswith('範例-'):
                 continue
+            records.append(record)
+
+            for day in days:
+                if day in date2index:
+                    if day in record.records:
+                        value = record.records[day]
+                        if value is None or value == '':
+                            if day in blank_days:
+                                blank_days[day] += 1
+                            else:
+                                blank_days[day] = 1
+                        elif value == 'F':
+                            if day in vacations:
+                                vacations[day] += 1
+                            else:
+                                vacations[day] = 1
+
+        vacation_days = set()
+        no_data_days = set()
+
+        for day, count in vacations.items():
+            if count * 3 >= len(records) * 2:
+                vacation_days.add(day)
+                print(f'{count} against {len(records)} - add {day} as vacation ({filename})')
+
+        for day, count in blank_days.items():
+            if count * 3 >= len(records) * 2:
+                no_data_days.add(day)
+                # print(f'add {day} as no data ({filename})')
+
+        days_left = len(no_data_days)
+        print(f'{len(vacation_days)} vacation, {days_left} day(s) without data')
+
+        for record in records:
+            if record.groupNumber != last_group:
+                group_serial_no = 1
+                last_group = record.groupNumber
+            else:
+                group_serial_no += 1
 
             attend_counters: dict[str, int] = {
-                'V': 0,
-                'L': 0,
-                'M': 0,
-                'O': 0,
-                'F': 0,
-                'A': 0,
+                'V': 0,  # 出席
+                'O': 0,  # 請假
+                'A': 0,  # 晚到(曠課)
+                'X': 0,  # 中輟
+                'D': 0,  # 日補
+                'N': 0,  # 夜捕
+                'W': 0,  # 公假
+                'F': 0,  # 放香
+                'M': 0,  # 補課
+                'L': 0,  # 遲到
+                'E': 0,  # 早退
+                '_': 0,  # 空白/無資料
             }
 
             datum: dict[str | int, str | int | dict[str, int]] = {
@@ -106,21 +155,31 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                 '班別': standard.className,
                 '組別': record.groupName,
                 '組號': record.groupNumber,
+                '序號': group_serial_no,
                 '執事': '',
             }
             # print(record.realName)
-            weeks = 0
             for day in days:
                 if day in date2index:
                     if day in record.records:
                         value = record.records[day]
                         datum[date2index[day]] = value
-                        if value in attend_counters:
-                            attend_counters[value] += 1
-                            if value == 'F':
-                                vacations.add(day)
+                        if value is None or value == '':
+                            if day not in no_data_days:
+                                attend_counters['_'] += 1
+                        elif value in attend_counters:
+                            if day not in no_data_days:
+                                attend_counters[value] += 1
+
+                                if value == 'F':
+                                    if day not in vacation_days:
+                                        print(f'Warning! {day} (should not be F for {record.realName}) )')
+                                else:
+                                    if day in vacation_days:
+                                        print(f'Warning! {day} (should be F for {record.realName})')
                             else:
-                                weeks += 1
+                                print(
+                                    f'Warning! {day} (got {value}, should be blank for {record.realName} / {class_name}) )')
                     else:
                         datum[date2index[day]] = ''
             # '出席V': 31, '遲到L': 32, '補課M': 33, '請假O': 34, '放香F': 35, '曠課A': 36, '全勤': 37, '勤學': 38, '結業': 39
@@ -133,23 +192,33 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
             datum['counters'] = attend_counters
             data.append(datum)
 
-        number_of_weeks = len(days) - len(vacations)
+        number_of_weeks = len(days) - len(vacation_days)
         graduation_standard = cfg.excel.graduation.graduation_standards.get(number_of_weeks)
 
         for datum in data:
             attend_counters = datum['counters']
             # print(f'{len(days)} - {len(vacations)} = {len(days) - len(vacations)}, weeks: {weeks}')
             graduated = False
-            if graduation_standard is not None:
+
+            if days_left > 0 and graduation_standard is not None:
                 if graduation_standard.calculate(attend_counters):
                     datum['結業'] = 'V'
-                    graduated = True
+                else:
+                    attend_counters['V'] += days_left
+                    if not graduation_standard.calculate(attend_counters):
+                        datum['結業'] = 'X'
+                    attend_counters['V'] -= days_left
+            else:
+                if graduation_standard is not None:
+                    if graduation_standard.calculate(attend_counters):
+                        datum['結業'] = 'V'
+                        graduated = True
 
-            if attend_counters['V'] == number_of_weeks:
-                datum['全勤'] = '全勤'
-            elif not graduated and attend_counters['V'] + attend_counters['L'] + attend_counters[
-                'M'] == number_of_weeks:
-                datum['勤學'] = '勤學'
+                if attend_counters['V'] == number_of_weeks:
+                    datum['全勤'] = '全勤'
+                elif not graduated and attend_counters['V'] + attend_counters['L'] + attend_counters[
+                    'M'] == number_of_weeks:
+                    datum['勤學'] = '勤學'
 
         supplier = (lambda y=x: x for x in data)
         template_service.write_data(supplier, callback=lambda x, y: add_page_break(x, y))
