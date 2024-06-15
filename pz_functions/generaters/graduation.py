@@ -204,10 +204,21 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                 if graduation_standard.calculate(attend_counters):
                     datum['結業'] = 'V'
                 else:
+                    saved = attend_counters
                     attend_counters['V'] += days_left
-                    if not graduation_standard.calculate(attend_counters):
-                        datum['結業'] = 'X'
-                    attend_counters['V'] -= days_left
+                    if graduation_standard.calculate(attend_counters):
+                        datum['結業'] = 'K'
+                    else:
+                        attend_counters = saved
+                        attend_counters['M'] += attend_counters['O']
+                        attend_counters['M'] += attend_counters['A']
+                        attend_counters['M'] += attend_counters['_']
+                        attend_counters['A'] = 0
+                        attend_counters['O'] = 0
+                        attend_counters['_'] = 0
+                        if graduation_standard.calculate(attend_counters):
+                            datum['結業'] = 'H'
+                    attend_counters = saved
             else:
                 if graduation_standard is not None:
                     if graduation_standard.calculate(attend_counters):
