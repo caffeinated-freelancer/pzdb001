@@ -1,8 +1,11 @@
 import os
 from typing import Callable, Any
 
+from openpyxl.utils import get_column_letter
+
 from pz.config import PzProjectExcelSpreadsheetConfig
 from pz.models.excel_model import ExcelModelInterface
+from pz.models.text_with_properties import TextWithProperties
 from services.excel_workbook_service import ExcelWorkbookService
 
 
@@ -61,7 +64,8 @@ class ExcelTemplateService:
             if column_name in data:
                 self.write_cell_at(row, index, data[column_name])
 
-    def insert_columns(self, index: int, amount: int):
+    def insert_columns(self, template_index, index: int, amount: int):
+
         self.service.sheet.insert_cols(idx=index, amount=amount)
 
         # print(f'insert columns at {index} -> {index + amount - 1}')
@@ -81,6 +85,30 @@ class ExcelTemplateService:
                 cell2 = self.service.get_cell(max_row, max_col)
                 self.service.sheet.unmerge_cells(f'{cell1.coordinate}:{cell2.coordinate}')
 
+        # template_cell = self.service.get_cell(1, template_index)
+        column_dimension = self.service.get_column_dimension(get_column_letter(template_index))
+
+        for column in range(template_index, index + amount, 1):
+            self.service.set_column_width(column, column_dimension.width)
+
+        # for row in range(1, self.header_row + self.data_skip_row + 3):
+        #     print(f'[Row: {row}] for column in range({self.service.max_column + amount - 1} down to {index + 1})')
+        #
+        #     for column in range(self.service.max_column + amount - 1, index + amount - 1, - 1):
+        #         # print(f'copy from row: {row}, column: {column - amount} to {column} ({index})')
+        #         source_cell = self.service.get_cell(row, column - amount)
+        #         target_cell = self.service.get_cell(row, column)
+        #         # self.service.set_cell_properties(row, column, source_cell)
+        #
+        #         try:
+        #             print(f'copy from {source_cell.column_letter} to {target_cell.column_letter}')
+        #             if row == 1:
+        #                 column_dimension = self.service.get_column_dimension(source_cell.column_letter)
+        #                 self.service.set_column_dimension(target_cell.column_letter, column_dimension)
+        #         except AttributeError:
+        #             pass
+
+        if len(saved_merged_cells) > 0:
             for merged_cell in saved_merged_cells:
                 min_col, min_row, max_col, max_row = merged_cell
                 cell1 = self.service.get_cell(min_row, min_col + amount)
@@ -88,7 +116,8 @@ class ExcelTemplateService:
                 self.service.sheet.merge_cells(f'{cell1.coordinate}:{cell2.coordinate}')
 
         for row in range(1, self.header_row + self.data_skip_row + 3):
-            template_cell = self.service.get_cell(row, index - 1)
+            template_cell = self.service.get_cell(row, template_index)
+
             for column in range(index, index + amount, 1):
                 self.service.set_cell_properties(row, column, template_cell)
 
@@ -115,13 +144,20 @@ class ExcelTemplateService:
                     self.add_page_break(row_num - 1)
 
             for column_name, index in self.headers.items():
+                self.service.set_cell_properties(row_num, index, template_cells[index - 1])
                 if column_name in datum:
+                    value = datum[column_name]
+                    if isinstance(value, TextWithProperties):
+                        if 'color' in value.properties:
+                            self.service.write_cell(row_num, index, value.text, color=value.properties['color'])
+                        else:
+                            self.service.write_cell(row_num, index, value.text)
+                    else:
+                        self.service.write_cell(row_num, index, value)
                     # print(row_num, self.data_skip_row)
-                    self.service.write_cell(row_num, index, datum[column_name])
                     # print(index, len(template_cells))
                 else:
                     self.service.write_cell(row_num, index, '')
-                self.service.set_cell_properties(row_num, index, template_cells[index - 1])
             self.service.set_row_dimensions(row_num, dimension)
             row_num += 1
             counter += 1

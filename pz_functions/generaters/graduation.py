@@ -6,6 +6,7 @@ from pz.config import PzProjectConfig, PzProjectExcelSpreadsheetConfig
 from pz.models.attend_record import AttendRecord
 from pz.models.graduation_standards import GraduationStandards
 from pz.models.output_graduation import PzGraduationForOutput
+from pz.models.text_with_properties import TextWithProperties
 from services.excel_template_service import ExcelTemplateService
 from services.excel_workbook_service import ExcelWorkbookService
 
@@ -21,6 +22,7 @@ def add_page_break(datum, prev_datum) -> tuple[Any, bool]:
 def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, GraduationStandards],
                                spreadsheet_cfg: PzProjectExcelSpreadsheetConfig, filename: str):
     matched = re.match(r'^(.*)_(.*)_上課.*', filename)
+
     if matched:
         class_name = matched.group(2)
         # print(class_name)
@@ -58,7 +60,10 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
         if len(days) > len(template_columns):
             index = template_service.get_headers().get(max(template_columns))
             amount = len(days) - len(template_columns)
-            template_service.insert_columns(index + 1, amount)
+
+            template_index = template_service.get_headers().get(min(template_columns))
+
+            template_service.insert_columns(template_index, index + 1, amount)
             value = max(template_columns)
             row = template_service.header_row
 
@@ -126,9 +131,11 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
         print(f'{len(vacation_days)} vacation, {days_left} day(s) without data')
 
         for record in records:
-            if record.groupNumber != last_group:
+            current_group_number = int(record.groupName)
+
+            if current_group_number != last_group:
                 group_serial_no = 1
-                last_group = record.groupNumber
+                last_group = current_group_number
             else:
                 group_serial_no += 1
 
@@ -147,14 +154,14 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                 '_': 0,  # 空白/無資料
             }
 
-            datum: dict[str | int, str | int | dict[str, int]] = {
+            datum: dict[str | int, str | int | TextWithProperties | dict[str, int]] = {
                 '學員編號': record.studentId,
                 '姓名': record.realName,
                 '法名': record.dharmaName,
                 '性別': record.gender,
                 '班別': standard.className,
                 '組別': record.groupName,
-                '組號': record.groupNumber,
+                '組號': current_group_number,
                 '序號': group_serial_no,
                 '執事': '',
             }
@@ -195,6 +202,8 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
         number_of_weeks = len(days) - len(vacation_days)
         graduation_standard = cfg.excel.graduation.graduation_standards.get(number_of_weeks)
 
+        notes = cfg.excel.graduation.template.additional_notes
+
         for datum in data:
             attend_counters = datum['counters']
             # print(f'{len(days)} - {len(vacations)} = {len(days) - len(vacations)}, weeks: {weeks}')
@@ -207,7 +216,7 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                     saved = attend_counters
                     attend_counters['V'] += days_left
                     if graduation_standard.calculate(attend_counters):
-                        datum['結業'] = 'K'
+                        datum['結業'] = notes['結業在即'] if '結業在即' in notes else 'K'
                     else:
                         attend_counters = saved
                         attend_counters['M'] += attend_counters['O']
@@ -217,7 +226,8 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                         attend_counters['O'] = 0
                         attend_counters['_'] = 0
                         if graduation_standard.calculate(attend_counters):
-                            datum['結業'] = 'H'
+                            datum['結業'] = TextWithProperties(notes['結業預警'] if '結業預警' in notes else 'H',
+                                                               {'color': 'FF0000'})
                     attend_counters = saved
             else:
                 if graduation_standard is not None:

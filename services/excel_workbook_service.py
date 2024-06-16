@@ -7,8 +7,8 @@ import openpyxl
 from openpyxl import Workbook
 from openpyxl.cell import Cell
 from openpyxl.styles import Font
-from openpyxl.utils import coordinate_to_tuple
-from openpyxl.worksheet.dimensions import RowDimension
+from openpyxl.utils import coordinate_to_tuple, get_column_letter
+from openpyxl.worksheet.dimensions import RowDimension, ColumnDimension
 from openpyxl.worksheet.pagebreak import Break
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -54,6 +54,11 @@ class ExcelWorkbookService:
 
         if header_at is not None:
             self.header_row = header_at
+
+        # for column in range(1, self.sheet.max_column):
+        #     letter = get_column_letter(column)
+        #
+        #     print(f'{letter}: {self.sheet.column_dimensions[letter].width}')
 
         # print(self.header_row)
 
@@ -122,21 +127,24 @@ class ExcelWorkbookService:
         return infos
 
     def write_cell(self, row_num, col_num, value, color: str | None = None, font=None):
-        current_font = self.sheet.cell(row_num, col_num).font
-        self.sheet.cell(row_num, col_num).value = value
+        cell = self.sheet.cell(row_num, col_num)
 
         if color is not None:
+            current_font = cell.font
+            # print(f'set color as {color}')
             # font.setColor(color)
-            self.sheet.cell(row_num, col_num).font = Font(color=color, family=current_font.family,
-                                                          size=current_font.size,
-                                                          bold=current_font.bold, italic=current_font.italic,
-                                                          underline=current_font.underline,
-                                                          vertAlign=current_font.vertAlign,
-                                                          outline=current_font.outline,
-                                                          shadow=current_font.shadow, strike=current_font.strike,
-                                                          charset=current_font.charset, condense=current_font.condense)
+            cell.font = Font(color=color, family=current_font.family,
+                             size=current_font.size,
+                             bold=current_font.bold, italic=current_font.italic,
+                             underline=current_font.underline,
+                             vertAlign=current_font.vertAlign,
+                             outline=current_font.outline,
+                             shadow=current_font.shadow, strike=current_font.strike,
+                             charset=current_font.charset, condense=current_font.condense)
         elif font is not None:
-            self.sheet.cell(row_num, col_num).font = font
+            cell.font = font
+
+        cell.value = value
 
     def get_font(self, row_num, col_num) -> Font:
         # col_num = col_num if col_num > 0 else 1
@@ -162,12 +170,28 @@ class ExcelWorkbookService:
         cell.border = copy(another_cell.border)
         cell.fill = copy(another_cell.fill)
 
-    def get_row_dimensions(self, row_num):
+    def get_row_dimensions(self, row_num) -> RowDimension:
         return self.sheet.row_dimensions[row_num]
 
     def set_row_dimensions(self, row_num, value: RowDimension):
         self.sheet.row_dimensions[row_num].height = value.height
         # self.sheet.row_dimensions[row_num].alignment = value.alignment
+
+    def get_column_dimension(self, col_num) -> ColumnDimension:
+        column_a_width = self.sheet.column_dimensions[col_num].width
+        if column_a_width is None:
+            print(f"Column {col_num} width is not set explicitly.")
+        else:
+            print(f"Column {col_num} width: {column_a_width}")
+        print(f'get column dimension for {col_num}, width: {self.sheet.column_dimensions[col_num].width}')
+        return self.sheet.column_dimensions[col_num]
+
+    def set_column_dimension(self, col_num, value: ColumnDimension):
+        self.sheet.column_dimensions[col_num].width = value.width
+        pass
+
+    def set_column_width(self, col_num, width: float):
+        self.sheet.column_dimensions[get_column_letter(col_num)].width = width
 
     def get_headers(self) -> dict[str, int]:
         return self.headers
