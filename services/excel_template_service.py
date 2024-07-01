@@ -6,7 +6,7 @@ from openpyxl.utils import get_column_letter
 from pz.config import PzProjectExcelSpreadsheetConfig
 from pz.models.excel_model import ExcelModelInterface
 from pz.models.text_with_properties import TextWithProperties
-from services.excel_workbook_service import ExcelWorkbookService
+from services.excel_workbook_service import ExcelWorkbookService, PzCellProperties
 
 
 class ExcelTemplateService:
@@ -40,6 +40,8 @@ class ExcelTemplateService:
                                             debug=debug)
         self.headers = self.service.get_headers()
         self.header_row = self.service.get_header_row()
+        if debug:
+            print(self.headers)
 
     def get_headers(self) -> dict[str | int, int]:
         return self.headers
@@ -122,12 +124,14 @@ class ExcelTemplateService:
                 self.service.set_cell_properties(row, column, template_cell)
 
     def write_data(self, suppliers,
-                   callback: Callable[[dict[str | int, str | int], Any], tuple[Any, bool]] | None = None):
+                   caller: Any | None = None,
+                   callback: Callable[[dict[str | int, str | int], Any, Any], tuple[Any, bool]] | None = None):
         row_num = self.header_row + 1 + self.data_skip_row
         counter = 0
 
         # fonts = [self.service.get_font(row_num, i) for i in range(1, len(self.headers), 1)]
-        template_cells = [self.service.get_cell(row_num + 1, i) for i in range(1, len(self.headers) + 1, 1)]
+        template_cells = [PzCellProperties(self.service.get_cell(row_num + 1, i)) for i in
+                          range(1, len(self.headers) + 1, 1)]
         dimension = self.service.get_row_dimensions(row_num)
 
         callback_data_holder = None
@@ -139,12 +143,13 @@ class ExcelTemplateService:
                 self.service.sheet.insert_rows(idx=row_num, amount=1)
 
             if callback is not None:
-                callback_data_holder, add_page_break = callback(datum, callback_data_holder)
+                callback_data_holder, add_page_break = callback(datum, callback_data_holder, caller)
+
                 if add_page_break:
                     self.add_page_break(row_num - 1)
 
             for column_name, index in self.headers.items():
-                self.service.set_cell_properties(row_num, index, template_cells[index - 1])
+                self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])
                 if column_name in datum:
                     value = datum[column_name]
                     if isinstance(value, TextWithProperties):
@@ -165,7 +170,7 @@ class ExcelTemplateService:
         for r in range(row_num, self.service.max_row() + 1):
             for column_name, index in self.headers.items():
                 self.service.write_cell(r, index, '')
-                self.service.set_cell_properties(row_num, index, template_cells[index - 1])
+                self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])
             self.service.set_row_dimensions(row_num, dimension)
 
         self.service.save_as(self.destination_path)

@@ -4,6 +4,7 @@ from copy import copy
 from typing import Any
 
 import openpyxl
+from loguru import logger
 from openpyxl import Workbook
 from openpyxl.cell import Cell
 from openpyxl.styles import Font
@@ -13,6 +14,14 @@ from openpyxl.worksheet.pagebreak import Break
 from openpyxl.worksheet.worksheet import Worksheet
 
 from pz.models.excel_model import ExcelModelInterface
+
+
+class PzCellProperties:
+    def __init__(self, another_cell: Cell):
+        self.alignment = copy(another_cell.alignment)
+        self.font = copy(another_cell.font)
+        self.border = copy(another_cell.border)
+        self.fill = copy(another_cell.fill)
 
 
 class ExcelWorkbookService:
@@ -38,8 +47,11 @@ class ExcelWorkbookService:
         self.debug = debug
         self.model: ExcelModelInterface = model
 
-        # print(self.wb.worksheets)
-        # print(self.wb.sheetnames)
+        logger.debug(self.wb.worksheets)
+        logger.debug(self.wb.sheetnames)
+        # if debug:
+        #     print(self.wb.worksheets)
+        #     print(self.wb.sheetnames)
         self.sheet = self.wb[sheet_name] if sheet_name is not None else self.wb.active
 
         # self.sheet = self.wb.worksheets[sheet_name]
@@ -60,7 +72,7 @@ class ExcelWorkbookService:
         #
         #     print(f'{letter}: {self.sheet.column_dimensions[letter].width}')
 
-        # print(self.header_row)
+        logger.info(self.header_row)
 
         self.rehash_header()
 
@@ -170,6 +182,14 @@ class ExcelWorkbookService:
         cell.border = copy(another_cell.border)
         cell.fill = copy(another_cell.fill)
 
+    def set_cell_properties_from_pz_cell(self, row_num, col_num, pz_cell: PzCellProperties):
+        cell = self.sheet.cell(row_num, col_num)
+
+        cell.alignment = copy(pz_cell.alignment)
+        cell.font = copy(pz_cell.font)
+        cell.border = copy(pz_cell.border)
+        cell.fill = copy(pz_cell.fill)
+
     def get_row_dimensions(self, row_num) -> RowDimension:
         return self.sheet.row_dimensions[row_num]
 
@@ -180,10 +200,10 @@ class ExcelWorkbookService:
     def get_column_dimension(self, col_num) -> ColumnDimension:
         column_a_width = self.sheet.column_dimensions[col_num].width
         if column_a_width is None:
-            print(f"Column {col_num} width is not set explicitly.")
+            logger.info(f"Column {col_num} width is not set explicitly.")
         else:
-            print(f"Column {col_num} width: {column_a_width}")
-        print(f'get column dimension for {col_num}, width: {self.sheet.column_dimensions[col_num].width}')
+            logger.info(f"Column {col_num} width: {column_a_width}")
+        logger.info(f'get column dimension for {col_num}, width: {self.sheet.column_dimensions[col_num].width}')
         return self.sheet.column_dimensions[col_num]
 
     def set_column_dimension(self, col_num, value: ColumnDimension):
@@ -206,5 +226,5 @@ class ExcelWorkbookService:
         return self.sheet.max_row
 
     def save_as(self, filename: str):
-        print(f'Save excel workbook as: {filename}')
+        logger.info(f'Save excel workbook as: {filename}')
         self.wb.save(filename)

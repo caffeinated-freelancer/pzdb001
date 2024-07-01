@@ -13,11 +13,13 @@ class MySqlImportAndFetchingService:
     config: PzProjectConfig
     db: PzMysqlDatabase
     current_table: str
+    previous_table: str
 
     def __init__(self, config: PzProjectConfig):
         self.config = config
         self.db = PzMysqlDatabase(config.mysql)
         self.current_table = f'class_members_{self.config.semester}'
+        self.previous_table = f'class_members_{self.config.previous_semester}'
 
     def access_db_member_to_mysql(self, service: MemberMergingService):
         # cols, results = service.read_all()
@@ -95,14 +97,28 @@ CREATE TABLE `{self.current_table}` (
             params = []
             for member in members:
                 param = []
+                have_error = False
                 for k, v in MysqlClassMemberEntity.VARIABLE_MAP.items():
-                    if k == 'id' or k == 'student_id' or k == 'class_group':
-                        param.append(int(member.__getattribute__(v)))
+                    value = member.__getattribute__(v)
+
+                    if k == 'student_id' and (value is None or not value.isdigit()):
+                        param.append(value)
+                        have_error = True
+                    elif k == 'id' or k == 'student_id' or k == 'class_group':
+                        try:
+                            param.append(int(value))
+                        except ValueError as e:
+                            # print(f'k:[{k}], value:[{value}], error:{e}')
+                            param.append(value)
+                            have_error = True
                     elif k == 'real_name':
-                        param.append(full_name_to_real_name(member.__getattribute__(v)))
+                        param.append(full_name_to_real_name(value))
                     else:
-                        param.append(member.__getattribute__(v))
-                params.append(tuple(param))
+                        param.append(value)
+                if have_error:
+                    print("Error:", param)
+                else:
+                    params.append(tuple(param))
 
             supplier = (lambda y=x: x for x in params)
             self.db.prepared_update(query, supplier)
@@ -124,3 +140,22 @@ CREATE TABLE `{self.current_table}` (
             entity = MysqlMemberDetailEntity(cols, result)
             entities.append(entity)
         return entities
+
+    def _read_seniors_from_table(self, table: str) -> list[MysqlClassMemberEntity]:
+        cols, results = self.db.query(f'''
+         SELECT * FROM `{table}` WHERE real_name in (
+         SELECT DISTINCT(senior) FROM `{table}`) 
+         AND real_name=senior AND deacon !=''
+         ORDER BY class_name,class_group;
+        ''')
+        entities = []
+        for result in results:
+            entity = MysqlClassMemberEntity(cols, result)
+            entities.append(entity)
+        return entities
+
+    def read_current_seniors(self) -> list[MysqlClassMemberEntity]:
+        return self._read_seniors_from_table(self.current_table)
+
+    def read_previous_seniors(self) -> list[MysqlClassMemberEntity]:
+        return self._read_seniors_from_table(self.current_table)

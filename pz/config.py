@@ -32,6 +32,15 @@ class PzProjectBaseConfig:
         return self.to_json()
 
 
+class PzProjectLoggingConfig(PzProjectBaseConfig):
+    level: str = 'INFO'
+    format: str = '{time} - {level} - {message}'
+    log_file: str
+
+    def __init__(self, variables: dict[str, Any]) -> None:
+        super().__init__(variables)
+
+
 class PzProjectMySqlConfig(PzProjectBaseConfig):
     user: str
     password: str
@@ -159,18 +168,24 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
     new_class_lineup: PzProjectExcelSpreadsheetConfig
     templates: dict[str, PzProjectExcelSpreadsheetConfig]
     graduation: PzProjectGraduationConfig
+    new_class_senior: PzProjectExcelSpreadsheetConfig
+    signup_next_info: PzProjectExcelSpreadsheetConfig
 
     def __init__(self, variables: dict[str, Any]) -> None:
         self.templates = {}
         super().__init__(variables, self.variable_initializer)
 
     def variable_initializer(self, variable: str, value: Any) -> bool:
-        if variable == 'questionnaire':
-            self.questionnaire = PzProjectExcelSpreadsheetConfig(value)
-        elif variable == 'new_class_lineup':
-            self.new_class_lineup = PzProjectExcelSpreadsheetConfig(value)
-        elif variable == 'graduation':
+        if variable == 'graduation':
             self.graduation = PzProjectGraduationConfig(value)
+        # elif variable == 'questionnaire':
+        #     self.questionnaire = PzProjectExcelSpreadsheetConfig(value)
+        # elif variable == 'new_class_lineup':
+        #     self.new_class_lineup = PzProjectExcelSpreadsheetConfig(value)
+        # elif variable == 'new_class_senior':
+        #     self.new_class_senior = PzProjectExcelSpreadsheetConfig(value)
+        elif variable in ('questionnaire', 'new_class_lineup', 'new_class_senior', 'signup_next_info'):
+            self.__setattr__(variable, PzProjectExcelSpreadsheetConfig(value))
         elif variable == 'templates':
             if isinstance(value, dict):
                 for k, v in value.items():
@@ -191,16 +206,38 @@ class PzProjectConfig(PzProjectBaseConfig):
     excel: PzProjectExcelConfig
     semester: str
     previous_semester: str
+    debug_text_file_output: str
+    logging: PzProjectLoggingConfig
 
     def __init__(self, filename: str, variables: dict[str, Any]) -> None:
         self.config_filename = filename
         if 'workspace' in variables:
             self.workspace = self.real_path(variables['workspace'])
             variables.pop('workspace')
+        else:
+            self.workspace = self.real_path(r'{USERPROFILE}\Desktop')
+            print(f'Warning! workspace path is {self.workspace}')
 
-        if 'template_folder' in variables:
-            self.template_folder = self.real_path(variables['template_folder'])
-            variables.pop('template_folder')
+        if 'output_folder' in variables:
+            self.output_folder = self.real_path(variables['output_folder'])
+            variables.pop('output_folder')
+        else:
+            self.workspace = self.real_path(r'{USERPROFILE}\Desktop')
+            print(f'Warning! output path is {self.output_folder}')
+
+        for v in ['template_folder', 'debug_text_file_output']:
+            if v in variables:
+                self.__setattr__(v, self.real_path(variables[v]))
+                variables.pop(v)
+
+        # if 'template_folder' in variables:
+        #     self.template_folder = self.real_path(variables['template_folder'])
+        #     variables.pop('template_folder')
+        #
+        # if 'debug_text_file_output' in variables:
+        #     self.debug_text_file_output = self.real_path(variables['debug_text_file_output'])
+        #     variables.pop('debug_text_file_output')
+
         PzProjectConfigGlobal.config = self
         super().__init__(variables, self.variable_initializer)
 
@@ -213,6 +250,8 @@ class PzProjectConfig(PzProjectBaseConfig):
             self.google = PzProjectGoogleConfig(value)
         elif variable == 'excel':
             self.excel = PzProjectExcelConfig(value)
+        elif variable == 'logging':
+            self.logging = PzProjectLoggingConfig(value)
         else:
             return False
         return True
@@ -243,7 +282,7 @@ class PzProjectConfig(PzProjectBaseConfig):
         # Create the class object and assign validated values
 
     def real_path(self, file_path: str) -> str:
-        matched = re.match(r'^(.*){([A-Z]+)}(.*)', file_path)
+        matched = re.match(r'^(.*){([A-Z]+[_A-Z][A-Z]+)}(.*)', file_path)
 
         if matched:
             if 'WORKSPACE' == matched.group(2):
@@ -251,10 +290,14 @@ class PzProjectConfig(PzProjectBaseConfig):
                 return f'{matched.group(1)}{self.workspace}{matched.group(3)}'
             elif 'TEMPLATE' == matched.group(2):
                 return f'{matched.group(1)}{self.template_folder}{matched.group(3)}'
+            elif 'OUTPUT_FOLDER' == matched.group(2):
+                return f'{matched.group(1)}{self.output_folder}{matched.group(3)}'
             return self.real_path(f'{matched.group(1)}{os.getenv(matched.group(2))}{matched.group(3)}')
 
         matched = re.match(r'^[A-Za-z]:.*', file_path)
         if matched:
+            return file_path
+        elif file_path.startswith(r'\\'):
             return file_path
         else:
             return os.path.join(self.workspace, file_path)

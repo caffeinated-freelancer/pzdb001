@@ -1,4 +1,5 @@
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
+from pz.models.new_class_senior import NewClassSeniorModel
 
 
 def class_name_ranking(name: str, is_senior: bool) -> int:
@@ -21,3 +22,10 @@ def class_name_ranking(name: str, is_senior: bool) -> int:
 def class_member_comparator(entity: MysqlClassMemberEntity):
     ranking = class_name_ranking(entity.class_name, entity.is_senior)
     return -ranking if entity.is_senior else ranking
+
+
+def new_class_senior_comparator(model: NewClassSeniorModel):
+    if model.groupId is not None:
+        return len(model.members) * 1000 + model.groupId
+    else:
+        return len(model.members) * 1000 + 999

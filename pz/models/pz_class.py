@@ -1,5 +1,7 @@
 from collections import OrderedDict
 
+from loguru import logger
+
 from pz.utils import full_name_to_names
 
 
@@ -34,4 +36,5 @@ class PzClass:
         else:
             prev = self.pzClassGroups[group_id]
             if senior != prev.seniorName:
-                print(f'Warning: class:[{self.pzClassName}], group:[{group_id}], senior:[{senior} vs {prev.senior}]')
+                logger.warning(
+                    f'Warning: class:[{self.pzClassName}], group:[{group_id}], senior:[{senior} vs {prev.seniorName}]')

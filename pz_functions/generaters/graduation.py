@@ -2,6 +2,8 @@ import glob
 import re
 from typing import Any
 
+from loguru import logger
+
 from pz.config import PzProjectConfig, PzProjectExcelSpreadsheetConfig
 from pz.models.attend_record import AttendRecord
 from pz.models.graduation_standards import GraduationStandards
@@ -120,7 +122,7 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
         for day, count in vacations.items():
             if count * 3 >= len(records) * 2:
                 vacation_days.add(day)
-                print(f'{count} against {len(records)} - add {day} as vacation ({filename})')
+                logger.info(f'{count} against {len(records)} - add {day} as vacation ({filename})')
 
         for day, count in blank_days.items():
             if count * 3 >= len(records) * 2:
@@ -128,7 +130,7 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                 # print(f'add {day} as no data ({filename})')
 
         days_left = len(no_data_days)
-        print(f'{len(vacation_days)} vacation, {days_left} day(s) without data')
+        logger.info(f'{len(vacation_days)} vacation, {days_left} day(s) without data')
 
         for record in records:
             current_group_number = int(record.groupName)
@@ -180,12 +182,12 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
 
                                 if value == 'F':
                                     if day not in vacation_days:
-                                        print(f'Warning! {day} (should not be F for {record.realName}) )')
+                                        logger.warning(f'Warning! {day} (should not be F for {record.realName}) )')
                                 else:
                                     if day in vacation_days:
-                                        print(f'Warning! {day} (should be F for {record.realName})')
+                                        logger.warning(f'Warning! {day} (should be F for {record.realName})')
                             else:
-                                print(
+                                logger.warning(
                                     f'Warning! {day} (got {value}, should be blank for {record.realName} / {class_name}) )')
                     else:
                         datum[date2index[day]] = ''
@@ -242,9 +244,9 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                     datum['勤學'] = '勤學'
 
         supplier = (lambda y=x: x for x in data)
-        template_service.write_data(supplier, callback=lambda x, y: add_page_break(x, y))
+        template_service.write_data(supplier, callback=lambda x, y, z: add_page_break(x, y))
     else:
-        print(f'{filename} 檔名需按標準命名 精舍名_班級名_上課...')
+        logger.warning(f'{filename} 檔名需按標準命名 精舍名_班級名_上課...')
 
 
 def generate_graduation_reports(cfg: PzProjectConfig):

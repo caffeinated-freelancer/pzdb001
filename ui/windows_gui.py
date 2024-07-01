@@ -14,6 +14,8 @@ from pz.config import PzProjectConfig
 from pz.utils import explorer_folder
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
+from pz_functions.generaters.senior import generate_senior_reports
+from pz_functions.importers.mysql_functions import write_access_to_mysql, write_google_to_mysql
 
 WINDOW_SIZE = 235
 DISPLAY_HEIGHT = 35
@@ -27,7 +29,7 @@ class PyPzWindows(QMainWindow):
         super().__init__()
         self.config = cfg
         self.setWindowTitle("普中資料管理程式")
-        self.setFixedSize(580, 400)
+        self.setFixedSize(580, 450)
         self.generalLayout = QVBoxLayout()
 
         centralWidget = QWidget(self)
@@ -52,13 +54,27 @@ class PyPzWindows(QMainWindow):
         os.startfile(self.config.output_folder)
 
     def run_generate_graduation_reports(self):
-        generate_graduation_reports(self.config)
-        # os.startfile(self.config.output_folder)
+        try:
+            generate_graduation_reports(self.config)
+            # os.startfile(self.config.output_folder)
+        except Exception as e:
+            print(e)
 
     def run_introducer_report(self):
-        self.config.make_sure_output_folder_exists()
-        self.config.explorer_output_folder()
-        generate_introducer_reports(self.config)
+        try:
+            self.config.make_sure_output_folder_exists()
+            self.config.explorer_output_folder()
+            generate_introducer_reports(self.config)
+        except Exception as e:
+            print(e)
+
+    def run_senior_report(self):
+        try:
+            self.config.make_sure_output_folder_exists()
+            self.config.explorer_output_folder()
+            generate_senior_reports(self.config)
+        except Exception as e:
+            print(e)
 
     def open_graduation_folder(self):
         explorer_folder(self.config.excel.graduation.records.spreadsheet_folder)
@@ -66,12 +82,27 @@ class PyPzWindows(QMainWindow):
     def open_questionnaire_folder(self):
         explorer_folder(self.config.excel.questionnaire.spreadsheet_folder)
 
+    def open_senior_folder(self):
+        explorer_folder(os.path.dirname(self.config.excel.new_class_senior.spreadsheet_file))
+
     def open_template_folder(self):
         explorer_folder(self.config.template_folder)
 
     def open_output_folder(self):
         self.config.make_sure_output_folder_exists()
         explorer_folder(self.config.output_folder)
+
+    def access_to_mysql(self):
+        try:
+            write_access_to_mysql(self.config)
+        except Exception as e:
+            print(e)
+
+    def google_to_mysql(self):
+        try:
+            write_google_to_mysql(self.config)
+        except Exception as e:
+            print(e)
 
     def open_settings_in_notepad(self):
         # Open the file content (might launch in browser on some systems)
@@ -87,7 +118,9 @@ class PyPzWindows(QMainWindow):
             [('[產出] 禪修班結業統計', self.run_generate_graduation_reports),
              ('上課記錄 資料夾', self.open_graduation_folder)],
             [('[產出] 介紹人電聯表', self.run_introducer_report), ('意願調查 資料夾', self.open_questionnaire_folder)],
-            [('[產出] 學長電聯表', self.do_nothing), ],
+            [('[產出] 學長電聯表', self.run_senior_report), ('學長電聯 資料夾', self.open_senior_folder)],
+            [('Access -> MySQL', self.access_to_mysql),
+             (f'Google -> {self.config.semester} 學員', self.google_to_mysql)],
             [('開啟程式設定檔', self.open_settings_in_notepad), ('輸出樣版 資料夾', self.open_template_folder)]
             # [('開課前電聯表', self.do_nothing), ],
             # [('關懷表', self.do_nothing), ],
@@ -100,7 +133,7 @@ class PyPzWindows(QMainWindow):
                 key = k[0]
                 func = k[1]
                 self.buttonMap[key] = QPushButton(key)
-                self.buttonMap[key].setFixedSize(250, 60)
+                self.buttonMap[key].setFixedSize(270, 60)
                 self.buttonMap[key].setFont(font)
                 if func is not None:
                     # print(key)

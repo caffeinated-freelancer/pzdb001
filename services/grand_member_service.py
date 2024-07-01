@@ -18,15 +18,21 @@ class PzGrandMemberService:
     config: PzProjectConfig
     mysql_service: MySqlImportAndFetchingService
     member_details_by_name: dict[str, list[MysqlMemberDetailEntity]]
+    member_details_by_student_id: dict[int, MysqlMemberDetailEntity]
     class_members_by_name: dict[str, list[MysqlClassMemberEntity]]
+    class_members_by_student_id: dict[int, MysqlClassMemberEntity]
     all_classes: OrderedDict[str, PzClass]
     deacon_members_by_name: OrderedDict[str, list[MysqlClassMemberEntity]]
     senior_by_student_id: dict[int, MysqlClassMemberEntity]
+    senior_by_class_and_group: dict[str, MysqlClassMemberEntity]
+    all_seniors: list[MysqlClassMemberEntity]
 
     def __init__(self, config: PzProjectConfig, from_access: bool = False, from_google: bool = False):
         self.config = config
 
         self.mysql_service = MySqlImportAndFetchingService(self.config)
+
+        self.senior_by_class_and_group = {}
 
         if from_google:
             self.init_class_members(self.read_class_members_from_google)
@@ -40,6 +46,7 @@ class PzGrandMemberService:
 
     def init_member_details(self, fetching_function: Callable[[], list[MysqlMemberDetailEntity]]):
         self.member_details_by_name = {}
+        self.member_details_by_student_id = {}
 
         entities = fetching_function()
 
@@ -49,11 +56,17 @@ class PzGrandMemberService:
             else:
                 self.member_details_by_name[entity.real_name] = [entity]
 
+            try:
+                self.member_details_by_student_id[int(entity.student_id)] = entity
+            except:
+                pass
+
     def init_class_members(self, fetching_function: Callable[[], list[MysqlClassMemberEntity]]):
         self.class_members_by_name = {}
         self.all_classes = OrderedDict()
         self.deacon_members_by_name = OrderedDict()
         self.senior_by_student_id = {}
+        self.class_members_by_student_id = {}
         entities = fetching_function()
 
         for entity in entities:
@@ -73,6 +86,8 @@ class PzGrandMemberService:
                     self.all_classes[entity.class_name] = PzClass(entity.class_name)
                 pz_class = self.all_classes[entity.class_name]
                 pz_class.add_class_group(entity.class_group, entity.senior)
+
+            self.class_members_by_student_id[entity.student_id] = entity
 
         for pz_class in self.all_classes.values():
             for group_id, pz_class_group in pz_class.pzClassGroups.items():
@@ -153,6 +168,34 @@ class PzGrandMemberService:
         # print(results)
         return results
 
+    def find_grand_member_by_pz_name_and_dharma_name(self, full_name: str, dharma_name: str | None, gender: str) -> \
+            tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity] | None:
+        results = self.find_grand_member_by_pz_name(full_name)
+        for result in results:
+            if result[0] is not None and result[0].dharma_name == dharma_name and result[0].gender == gender:
+                return result
+
+        return None
+
+    def find_class_member_by_student_id(self, student_id: int) -> MysqlClassMemberEntity | None:
+        if student_id in self.class_members_by_student_id:
+            return self.class_members_by_student_id[student_id]
+        return None
+
+    def find_member_details_by_student_id(self, student_id: int) -> MysqlMemberDetailEntity | None:
+        if student_id in self.member_details_by_student_id:
+            return self.member_details_by_student_id[student_id]
+        return None
+
+    def find_grand_member_by_student_id(self, student_id: int) -> tuple[
+                                                                      MysqlMemberDetailEntity, MysqlClassMemberEntity] | None:
+        class_members = self.find_class_member_by_student_id(student_id)
+        member_details = self.find_member_details_by_student_id(student_id)
+
+        if class_members is not None or member_details is not None:
+            return member_details, class_members
+        return None
+
     def find_one_class_member_by_pz_name(self, full_name: str) -> MysqlClassMemberEntity | None:
         results = [x[1] for x in self.find_grand_member_by_pz_name(full_name)]
 
@@ -194,3 +237,20 @@ class PzGrandMemberService:
             entities.append(entity)
 
         return entities
+
+    @staticmethod
+    def class_group_as_key(class_name: str, class_group: int):
+        return f'{class_name}_{class_group}'
+
+    def _read_senior_into_cache(self):
+        if len(self.senior_by_class_and_group) == 0:
+            self.all_seniors = self.mysql_service.read_current_seniors()
+
+            for senior in self.all_seniors:
+                key = self.class_group_as_key(senior.class_name, senior.class_group)
+
+                self.senior_by_class_and_group[key] = senior
+
+    def read_all_seniors(self) -> list[MysqlClassMemberEntity]:
+        self._read_senior_into_cache()
+        return self.all_seniors
