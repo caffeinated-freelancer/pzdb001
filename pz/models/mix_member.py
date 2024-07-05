@@ -70,6 +70,12 @@ class MixMember:
         else:
             return ''
 
+    def get_cha_for_tea(self) -> str:
+        if self.questionnaireInfo is not None:
+            return self.questionnaireInfo.chaForTea
+        else:
+            return ''
+
     def get_phone(self) -> str:
         if self.questionnaireInfo is not None:
             phone = str(self.questionnaireInfo.mobilePhone)

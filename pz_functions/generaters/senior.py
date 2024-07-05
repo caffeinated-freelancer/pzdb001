@@ -222,6 +222,7 @@ class SeniorReportGenerator:
                         '介紹人電話行動&市話': introducer_phone,
                         '報名時備註': member.get_remark(),
                         '茶會': member.get_tee(),
+                        '喫茶趣': member.get_cha_for_tea(),
                     }
                     data.append(datum)
 
@@ -261,6 +262,7 @@ class SeniorReportGenerator:
                         '法名': member.get_dharma_name(),
                         '學員電話行動&市話': member.get_phone(),
                         '上期班別/學長': member.get_last_record(),
+                        '喫茶趣': member.get_cha_for_tea(),
                     }
                     data.append(datum)
 

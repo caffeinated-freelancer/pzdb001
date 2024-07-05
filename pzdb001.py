@@ -1,5 +1,7 @@
+import os
 import sys
 from getopt import getopt, GetoptError
+from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -47,7 +49,13 @@ if __name__ == '__main__':
         print(f"Error parsing options: {err}")
         sys.exit(2)
 
-    config_file = 'C:/Applications/pzdb001/config.yaml'
+    default_config_file = r'C:\Applications\pzdb001\config.yaml'
+
+    if not Path(default_config_file).exists():
+        default_config_file = r'\\NS-Puzhong2\資料組\禪修程式檔\config.yaml'
+
+    # config_file = os.getenv('PZDB_CONFIG', r'\\NS-Puzhong2\資料組\禪修程式檔\config.yaml')
+    config_file = os.getenv('PZDB_CONFIG', default_config_file)
     verbose = False
     debug = False
     write_access_to_mysql_flag = False

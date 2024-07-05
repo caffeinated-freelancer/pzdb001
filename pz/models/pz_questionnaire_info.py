@@ -11,6 +11,7 @@ class PzQuestionnaireInfo(ExcelModelInterface):
         'birthday': '出生日期',
         'reason': '來精舍原因',
         'tee': '茶會',
+        'chaForTea': '喫茶趣',
         'registerClass': '報班',
         # 'registerClass': '報名班別',
         'personalId': '身分證字號',
@@ -42,6 +43,7 @@ class PzQuestionnaireInfo(ExcelModelInterface):
     birthday: str
     reason: str
     tee: str
+    chaForTea: str
     registerClass: str
     personalId: str
     mobilePhone: str
