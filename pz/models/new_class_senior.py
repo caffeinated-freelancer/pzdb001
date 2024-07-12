@@ -1,6 +1,6 @@
 import json
-from typing import Any
 
+from pz.models.assigned_member import AssignedMember
 from pz.models.excel_model import ExcelModelInterface
 
 
@@ -10,6 +10,7 @@ class NewClassSeniorModel(ExcelModelInterface):
         'className': '班級',
         'groupId': '組別',
         'fullName': '姓名',
+        'senior': '學長',
         'deacon': '執事',
         'dharmaName': '法名',
         'gender': '性別',
@@ -18,12 +19,13 @@ class NewClassSeniorModel(ExcelModelInterface):
     className: str
     groupId: int
     fullName: str
+    senior: str
     deacon: str
     dharmaName: str
     gender: str
 
     studentId: int
-    members: list[Any]  # MixMember actually
+    members: list[AssignedMember]
 
     def __init__(self, values: dict[str, str]):
         for k, v in NewClassSeniorModel.VARIABLE_MAP.items():

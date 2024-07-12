@@ -47,8 +47,6 @@ class ExcelWorkbookService:
         self.debug = debug
         self.model: ExcelModelInterface = model
 
-        logger.debug(self.wb.worksheets)
-        logger.debug(self.wb.sheetnames)
         # if debug:
         #     print(self.wb.worksheets)
         #     print(self.wb.sheetnames)
@@ -72,7 +70,7 @@ class ExcelWorkbookService:
         #
         #     print(f'{letter}: {self.sheet.column_dimensions[letter].width}')
 
-        logger.info(self.header_row)
+        logger.debug(f'{excel_file}: {self.wb.sheetnames}/row:{self.header_row} - {self.wb.worksheets}')
 
         self.rehash_header()
 
@@ -94,7 +92,7 @@ class ExcelWorkbookService:
                     if matched:
                         value = matched.group(1)
                 self.headers[value] = colNum
-                self.headers_rev[colNum] = value
+                self.headers_rev[colNum] = value.strip()
                 self.max_column = max(self.max_column, colNum)
                 # print(value, max_column)
 
@@ -118,14 +116,18 @@ class ExcelWorkbookService:
             for colNum in range(1, self.max_column, 1):
                 if colNum in self.headers_rev:
                     cell = self.sheet.cell(rowNum, colNum)
-                    item[self.headers_rev[colNum]] = cell.value
+                    value = cell.value
+                    if isinstance(value, str):
+                        item[self.headers_rev[colNum]] = value.strip()
+                    else:
+                        item[self.headers_rev[colNum]] = value
 
                 # print(cell.value, end='  ')
             # info = PzContactInfo(item)
             info = self.model.new_instance(item)
 
             if required_attribute is not None:
-                if hasattr(info, required_attribute):
+                if hasattr(info, required_attribute) and info.__dict__.get(required_attribute) is not None:
                     # print(info.to_json())
                     infos.append(info)
             else:

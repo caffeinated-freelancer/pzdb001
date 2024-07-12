@@ -1,4 +1,5 @@
 import glob
+import os
 from typing import Any
 
 from loguru import logger
@@ -7,16 +8,16 @@ from pz.config import PzProjectConfig
 from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
+from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
-from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
 from pz.models.senior_contact_advanced import SeniorContactAdvanced
 from pz.models.senior_contact_fundamental import SeniorContactFundamental
-from pz.utils import full_name_to_names
 from services.excel_template_service import ExcelTemplateService
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
 from services.new_class_senior_service import NewClassSeniorService
 from services.prev_senior_service import PreviousSeniorService
+from services.questionnaire_service import QuestionnaireService
 from services.signup_next_info_service import SignupNextInfoService
 
 
@@ -30,21 +31,26 @@ def add_page_break(datum, prev_datum) -> tuple[Any, bool]:
 
 class SeniorReportGenerator:
     config: PzProjectConfig
+    from_scratch: bool
     member_service: PzGrandMemberService
     new_senior_service: NewClassSeniorService
     signup_next_service: SignupNextInfoService
     prev_senior_service: PreviousSeniorService
+    questionnaire_service: QuestionnaireService
 
     # prev_class_senior_map: dict[str, NewClassSeniorModel]  # 舊的班級學長到哪了
 
-    def __init__(self, config: PzProjectConfig):
+    def __init__(self, config: PzProjectConfig, from_scratch: bool):
         self.config = config
+        self.from_scratch = from_scratch
 
         self.member_service = PzGrandMemberService(config, from_access=False, from_google=False)
         self.new_senior_service = NewClassSeniorService(config, self.member_service)
         self.prev_senior_service = PreviousSeniorService(self.member_service, self.new_senior_service)
         self.signup_next_service = SignupNextInfoService(config, self.member_service, self.prev_senior_service,
                                                          self.new_senior_service)
+        self.questionnaire_service = QuestionnaireService(config, self.member_service, self.prev_senior_service,
+                                                          self.new_senior_service, self.signup_next_service)
 
         if config.debug_text_file_output is not None:
             self.fp = open(config.debug_text_file_output, "w", encoding="utf-8")
@@ -72,84 +78,31 @@ class SeniorReportGenerator:
         return f'{class_name}-{gender}'
 
     def auto_assignment(self, spreadsheet_file: str):
-        class_members: dict[str, list[MixMember]] = {}
+        # 預先處理, 記載每個學員的升班意願
+        self.signup_next_service.pre_processing()
 
-        self.assign_having_senior_signup_next(class_members)
-        self.assign_having_senior_questionnaire(spreadsheet_file, class_members)
+        # 預先處理禪修班意願調查表, 包括讀取及連結介紹人的部份
+        self.questionnaire_service.pre_processing(spreadsheet_file)
 
-        for class_gender in class_members:
-            # print(f'class: {class_gender}, member: {len(class_members[class_gender])}')
-            for member in class_members[class_gender]:
-                self.new_senior_service.min_member_first_assign(class_gender, member)
+        self.new_senior_service.perform_follower_loop_first()
 
-    def assign_having_senior_signup_next(self, class_members: dict[str, list[MixMember]]):
-        unassigned_signups = self.signup_next_service.processing_signups()
+        # 處理所有升班調查的部份
+        self.signup_next_service.processing_signups()
 
-        for signup in unassigned_signups:
-            for entry in signup.signupNextInfo.signups:
-                if signup.classMember is not None:
-                    key = self.class_gender_as_key(entry, signup.classMember.gender)
-                    if key in class_members:
-                        class_members[key].append(signup)
-                    else:
-                        class_members[key] = [signup]
+        # 處理所有意願調查的部份
+        self.questionnaire_service.assign_having_senior_questionnaire()
+        # self.assign_having_senior_questionnaire(spreadsheet_file)
 
-    def assign_having_senior_questionnaire(self, spreadsheet_file: str, class_members: dict[str, list[MixMember]]):
-        service = ExcelWorkbookService(PzQuestionnaireInfo({}), spreadsheet_file,
-                                       self.config.excel.questionnaire.sheet_name,
-                                       header_at=self.config.excel.questionnaire.header_row,
-                                       debug=False)
-        entries: list[PzQuestionnaireInfo] = service.read_all(required_attribute='fullName')
+        self.signup_next_service.add_to_pending_groups()
 
-        for entry in entries:
-            if entry.registerClass is not None and entry.registerClass != '':  # 所有有意願調查有指定班級的
-                class_name = entry.registerClass.replace('班', '')
-                entry.registerClass = class_name
+        self.new_senior_service.adding_unregistered_follower_chain()
 
-                name_tuple = full_name_to_names(entry.fullName)
-                matched_members = self.member_service.find_grand_member_by_pz_name(name_tuple[0])
-                mix_member = None
 
-                for m in matched_members:
-                    if m[0].birthday == entry.birthday and m[0].gender == entry.gender:
-                        mix_member = MixMember(m[0], m[1], entry, None)
-                        if m[1] is not None:
-                            prev_senior = m[1].senior
-                            senior_jobs = self.prev_senior_service.find_previous_senior(m[1].class_name,
-                                                                                        m[1].class_group)
+        # 對所有的班級分配組別
+        self.new_senior_service.perform_auto_assignment()
 
-                            if len(senior_jobs) > 0:
-                                for job in senior_jobs:
-                                    if job.fullName != prev_senior:
-                                        logger.warning(f'Warning: 學長姓名 from {prev_senior} to {job.fullName}')
-                                    else:
-                                        if job.className == entry.registerClass:
-                                            logger.info(
-                                                f'{entry.fullName} {entry.registerClass} 加入前學長 {job.fullName} {job.className} 班級')
-                                            self.new_senior_service.add_member_to(job, mix_member)
-                                        # else:
-                                        #     print(
-                                        #         f'{entry.fullName} {entry.registerClass} : 前學長 {job.fullName} at {job.className}')
-                            else:
-                                logger.info(f'之前的學長 {m[1].senior} 沒有帶新班級')
-
-                if mix_member is None:
-                    mix_member = MixMember(None, None, entry, None)
-
-                if mix_member.senior is None:  # 需要自動排的
-                    key = self.class_gender_as_key(class_name, entry.gender)
-
-                    if key in class_members:
-                        class_members[key].append(mix_member)
-                    else:
-                        class_members[key] = [mix_member]
-
-        # for class_gender in class_members:
-        #     # print(f'class: {class_gender}, member: {len(class_members[class_gender])}')
-        #     for member in class_members[class_gender]:
-        #         self.new_senior_service.min_member_first_assign(class_gender, member)
-
-        # self.new_senior_service.find_by_class_gender(class_gender)
+    # def pre_processing_questionnaire(self, spreadsheet_file: str):
+    #     pass
 
     @staticmethod
     def _take_introducer_info_from(m: tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity]) -> tuple[str, str]:
@@ -199,34 +152,33 @@ class SeniorReportGenerator:
         for senior in seniors:
             # print(f'[{__name__}] senior: {senior.className} {senior.groupId} - {senior.fullName} ({senior.gender})')
 
-            members = senior.members
             group_sn = 0
-            for member in members:
-                if isinstance(member, MixMember):
-                    group_sn += 1
-                    grand_total += 1
+            for assigned_member in senior.members:
+                member = assigned_member.member
+                group_sn += 1
+                grand_total += 1
 
-                    (introducer_class, introducer_phone) = self._take_introducer_info(
-                        member.questionnaireInfo.introducerName) if member.questionnaireInfo is not None else ('', '')
+                (introducer_class, introducer_phone) = self._take_introducer_info(
+                    member.questionnaireInfo.introducerName) if member.questionnaireInfo is not None else ('', '')
 
-                    datum: dict[str, str | int] = {
-                        '組序': group_sn,
-                        '姓名': member.get_full_name(),
-                        '班別': senior.className,
-                        '學長': senior.fullName,
-                        '組別': senior.groupId,
-                        '法名': member.get_dharma_name(),
-                        '學員電話行動&市話': member.get_phone(),
-                        '介紹人': member.get_introducer_name(),
-                        '介紹人班別/組別': introducer_class,
-                        '介紹人電話行動&市話': introducer_phone,
-                        '報名時備註': member.get_remark(),
-                        '茶會': member.get_tee(),
-                        '喫茶趣': member.get_cha_for_tea(),
-                    }
-                    data.append(datum)
+                datum: dict[str, str | int] = {
+                    '組序': group_sn,
+                    '姓名': member.get_full_name(),
+                    '班別': senior.className,
+                    '學長': senior.fullName,
+                    '組別': senior.groupId,
+                    '法名': member.get_dharma_name(),
+                    '學員電話行動&市話': member.get_phone(),
+                    '介紹人': member.get_introducer_name(),
+                    '介紹人班別/組別': introducer_class,
+                    '介紹人電話行動&市話': introducer_phone,
+                    '報名時備註': member.get_remark(),
+                    '茶會': member.get_tee(),
+                    '喫茶趣': member.get_cha_for_tea(),
+                }
+                data.append(datum)
 
-                    self._print_data_as_text(senior, member, group_sn, grand_total)
+                self._print_data_as_text(senior, member, group_sn, grand_total)
 
         template = ExcelTemplateService(SeniorContactFundamental({}),
                                         self.config.excel.templates['fundamental_contact'],
@@ -246,27 +198,26 @@ class SeniorReportGenerator:
         for senior in seniors:
             # print(f'senior: {senior.className} {senior.groupId} - {senior.fullName} ({senior.gender})')
 
-            members = senior.members
             group_sn = 0
-            for member in members:
-                if isinstance(member, MixMember):
-                    group_sn += 1
-                    grand_total += 1
+            for assigned_member in senior.members:
+                member = assigned_member.member
+                group_sn += 1
+                grand_total += 1
 
-                    datum: dict[str, str | int] = {
-                        '組序': group_sn,
-                        '姓名': member.get_full_name(),
-                        '班別': senior.className,
-                        '學長': senior.fullName,
-                        '組別': senior.groupId,
-                        '法名': member.get_dharma_name(),
-                        '學員電話行動&市話': member.get_phone(),
-                        '上期班別/學長': member.get_last_record(),
-                        '喫茶趣': member.get_cha_for_tea(),
-                    }
-                    data.append(datum)
+                datum: dict[str, str | int] = {
+                    '組序': group_sn,
+                    '姓名': member.get_full_name(),
+                    '班別': senior.className,
+                    '學長': senior.fullName,
+                    '組別': senior.groupId,
+                    '法名': member.get_dharma_name(),
+                    '學員電話行動&市話': member.get_phone(),
+                    '上期班別/學長': member.get_last_record(),
+                    '喫茶趣': member.get_cha_for_tea(),
+                }
+                data.append(datum)
 
-                    self._print_data_as_text(senior, member, group_sn, grand_total)
+                self._print_data_as_text(senior, member, group_sn, grand_total)
 
         template = ExcelTemplateService(SeniorContactAdvanced({}),
                                         self.config.excel.templates['advanced_contact'],
@@ -282,7 +233,7 @@ class SeniorReportGenerator:
         # template.write_data(supplier)
         template.write_data(supplier, callback=lambda x, y, z: add_page_break(x, y))
 
-    def reading_report(self, spreadsheet_file: str):
+    def processing_senior_report(self, spreadsheet_file: str):
         self.auto_assignment(spreadsheet_file)
 
         for class_name in self.new_senior_service.all_classes:
@@ -291,14 +242,85 @@ class SeniorReportGenerator:
             else:
                 self._generate_advanced_report(class_name, spreadsheet_file)
 
+    def read_predefined_information(self):
+        if self.from_scratch:
+            return
 
-def generate_senior_reports(cfg: PzProjectConfig):
-    generator = SeniorReportGenerator(cfg)
+        spreadsheet = self.config.excel.new_class_predefined_info
 
-    if cfg.excel.questionnaire.spreadsheet_folder is not None and cfg.excel.questionnaire.spreadsheet_folder != '':
-        files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
+        service = ExcelWorkbookService(NewClassLineup({}), spreadsheet.spreadsheet_file,
+                                       sheet_name=spreadsheet.sheet_name,
+                                       header_at=spreadsheet.header_row)
+        entries: list[NewClassLineup] = service.read_all(required_attribute='realName')
+        for entry in entries:
+            print(entry.to_json())
 
-        for filename in files:
-            generator.reading_report(filename)
+    def generate_new_class_lineup(self, filename: str):
+        template_key = 'new_class_lineup'
+
+        if template_key not in self.config.excel.templates:
+            logger.error(f'輸出樣版未設定 {template_key}')
+        else:
+            template_file = self.config.excel.templates['new_class_lineup']
+            data = []
+            grand_total = 0
+
+            for class_name in self.new_senior_service.all_classes:
+                seniors = self.new_senior_service.all_classes[class_name]
+
+                for senior in seniors:
+                    group_sn = 0
+
+                    for assigned_member in senior.members:
+                        member = assigned_member.member
+                        group_sn += 1
+                        grand_total += 1
+
+                        phone = ''
+                        if member.questionnaireInfo is not None:
+                            phone = member.questionnaireInfo.mobilePhone
+
+                        datum: dict[str, str | int] = {
+                            '總序': grand_total,
+                            '序': group_sn,
+                            '學員編號': member.get_student_id() if member.get_student_id() is not None else '',
+                            '班級': senior.className,
+                            '學長': senior.fullName,
+                            '姓名': member.get_full_name(),
+                            '法名': member.get_dharma_name(),
+                            '性別': member.get_gender(),
+                            '執事': assigned_member.deacon if assigned_member.deacon is not None else '',
+                            '組別': senior.groupId,
+                            '行動電話': phone,
+                            '上期學長': member.get_last_record(),
+                            '自動編班資訊': assigned_member.reason if assigned_member.reason is not None else '',
+                        }
+                        data.append(datum)
+
+            template = ExcelTemplateService(NewClassLineup({}),
+                                            template_file,
+                                            filename, self.config.output_folder,
+                                            f'[新編班資料]')
+            supplier = (lambda y=x: x for x in data)
+            template.write_data(supplier)
+
+
+def generate_senior_reports(cfg: PzProjectConfig, from_scratch: bool):
+    if not from_scratch:
+        if not os.path.exists(cfg.excel.new_class_predefined_info.spreadsheet_file):
+            from_scratch = True
+
+    generator = SeniorReportGenerator(cfg, from_scratch)
+
+    if not from_scratch:
+        generator.read_predefined_information()
     else:
-        generator.reading_report(cfg.excel.questionnaire.spreadsheet_file)
+        if cfg.excel.questionnaire.spreadsheet_folder is not None and cfg.excel.questionnaire.spreadsheet_folder != '':
+            files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
+
+            for filename in files:
+                generator.processing_senior_report(filename)
+                generator.generate_new_class_lineup(filename)
+        else:
+            generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file)
+            generator.generate_new_class_lineup(cfg.excel.questionnaire.spreadsheet_file)

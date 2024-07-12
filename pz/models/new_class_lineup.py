@@ -3,37 +3,42 @@ import json
 from pz.models.excel_model import ExcelModelInterface
 
 
-class SignupNextInfoModel(ExcelModelInterface):
+class NewClassLineup(ExcelModelInterface):
     VARIABLE_MAP = {
-        'studentId': '學員編號(公式)',
+        'sn': '總序',
+        'no': '序',
+        'studentId': '學員編號',
         'className': '班級',
         'senior': '學長',
         'groupId': '組別',
-        'fullName': '姓名',
+        'realName': '姓名',
+        'deacon': '執事',
         'dharmaName': '法名',
-        'signup1': '上課班別',
-        'signup2': '發心上第二班禪修班',
+        'gender': '性別',
+        'phoneNumber': '行動電話',
+        'lastSenior': '上期學長'
     }
 
-    studentId: int
+    sn: int
+    no: int
+    studentId: int | None
     className: str
     senior: str
     groupId: int
-    fullName: str
+    realName: str
+    deacon: str
     dharmaName: str
-    signup1: str
-    signup2: str
-    signups: set[str]
+    phoneNumber: str | None
+    lastSenior: str | None
 
     def __init__(self, values: dict[str, str]):
-        for k, v in SignupNextInfoModel.VARIABLE_MAP.items():
+        for k, v in NewClassLineup.VARIABLE_MAP.items():
             if v in values:
                 # if values[v] is not None:
                 self.__dict__[k] = values[v]
-        self.signups = set()
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4, ensure_ascii=False)
 
     def new_instance(self, args):
-        return SignupNextInfoModel(args)
+        return NewClassLineup(args)

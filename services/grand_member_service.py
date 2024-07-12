@@ -1,6 +1,8 @@
 from collections import OrderedDict
 from typing import Callable
 
+from loguru import logger
+
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
 from pz.comparators import class_member_comparator
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
@@ -20,7 +22,7 @@ class PzGrandMemberService:
     member_details_by_name: dict[str, list[MysqlMemberDetailEntity]]
     member_details_by_student_id: dict[int, MysqlMemberDetailEntity]
     class_members_by_name: dict[str, list[MysqlClassMemberEntity]]
-    class_members_by_student_id: dict[int, MysqlClassMemberEntity]
+    class_members_by_student_id: dict[int, list[MysqlClassMemberEntity]]
     all_classes: OrderedDict[str, PzClass]
     deacon_members_by_name: OrderedDict[str, list[MysqlClassMemberEntity]]
     senior_by_student_id: dict[int, MysqlClassMemberEntity]
@@ -87,7 +89,11 @@ class PzGrandMemberService:
                 pz_class = self.all_classes[entity.class_name]
                 pz_class.add_class_group(entity.class_group, entity.senior)
 
-            self.class_members_by_student_id[entity.student_id] = entity
+            if entity.student_id in self.class_members_by_student_id:
+                self.class_members_by_student_id[entity.student_id].append(entity)
+                # print(f'{entity.student_id} {entity.class_name} {entity.senior}')
+            else:
+                self.class_members_by_student_id[entity.student_id] = [entity]
 
         for pz_class in self.all_classes.values():
             for group_id, pz_class_group in pz_class.pzClassGroups.items():
@@ -154,14 +160,42 @@ class PzGrandMemberService:
 
         return match_list
 
-    def find_grand_member_by_pz_name(self, full_name: str) -> list[
+    def find_relax_grand_member_by_pz_name(self, full_name: str, debug: bool = False) -> list[
         tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity]]:
         class_members = self.find_class_member_by_pz_name(full_name)
         member_details = self.find_member_details_by_pz_name(full_name)
 
         results = []
+
+        if len(class_members) == 0 and len(member_details) == 0:
+            pass
+        elif len(member_details) != 0:
+            for member_detail in member_details:
+                results.append((member_detail, None))
+        else:
+            for m1 in member_details:
+                if debug:
+                    logger.warning(f'{m1.to_json()}')
+                for m2 in class_members:
+                    if debug:
+                        logger.warning(f'{m2.to_json()}')
+                    if m1.id == m2.student_id:
+                        results.append((m1, m2))
+        return results
+
+    def find_grand_member_by_pz_name(self, full_name: str, debug: bool = False) -> list[
+        tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity]]:
+        class_members = self.find_class_member_by_pz_name(full_name)
+        member_details = self.find_member_details_by_pz_name(full_name)
+
+        results = []
+
         for m1 in member_details:
+            if debug:
+                logger.warning(f'{m1.to_json()}')
             for m2 in class_members:
+                if debug:
+                    logger.warning(f'{m2.to_json()}')
                 if m1.id == m2.student_id:
                     results.append((m1, m2))
 
@@ -177,7 +211,7 @@ class PzGrandMemberService:
 
         return None
 
-    def find_class_member_by_student_id(self, student_id: int) -> MysqlClassMemberEntity | None:
+    def find_class_member_by_student_id(self, student_id: int) -> list[MysqlClassMemberEntity] | None:
         if student_id in self.class_members_by_student_id:
             return self.class_members_by_student_id[student_id]
         return None
@@ -187,14 +221,39 @@ class PzGrandMemberService:
             return self.member_details_by_student_id[student_id]
         return None
 
-    def find_grand_member_by_student_id(self, student_id: int) -> tuple[
-                                                                      MysqlMemberDetailEntity, MysqlClassMemberEntity] | None:
+    def find_grand_member_by_student_id(self, student_id: int, prefer: str = None) -> tuple[
+                                                                                          MysqlMemberDetailEntity, MysqlClassMemberEntity] | None:
         class_members = self.find_class_member_by_student_id(student_id)
         member_details = self.find_member_details_by_student_id(student_id)
 
         if class_members is not None or member_details is not None:
-            return member_details, class_members
+            class_member = class_members[0] if class_members is not None else None
+            if prefer is not None and class_members is not None:
+                for m in class_members:
+                    if m.class_name == prefer:
+                        return member_details, m
+                logger.warning(f'{student_id} / {class_member.real_name}: {prefer} not found')
+            return member_details, class_member
         return None
+
+    def find_all_grand_member_by_student_id(self, student_id: int) -> list[
+        tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity]]:
+        class_members = self.find_class_member_by_student_id(student_id)
+
+        if class_members is None or len(class_members) == 1:
+            result = self.find_grand_member_by_student_id(student_id)
+            return [result] if result is not None else []
+
+        member_details = self.find_member_details_by_student_id(student_id)
+
+        results = []
+        for class_member in class_members:
+            results.append((member_details, class_member))
+
+        # if len(results) > 0:
+        #     print(f'{results[0][1].class_name} vs {results[1][1].class_name}')
+
+        return results
 
     def find_one_class_member_by_pz_name(self, full_name: str) -> MysqlClassMemberEntity | None:
         results = [x[1] for x in self.find_grand_member_by_pz_name(full_name)]

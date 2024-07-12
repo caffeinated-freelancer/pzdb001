@@ -62,6 +62,7 @@ if __name__ == '__main__':
     write_google_to_mysql_flag = False
     generate_introducer_reports_flag = False
     generate_senior_reports_flag = False
+    generate_predefined_senior_reports_flag = False
     generate_graduation_reports_flag = False
     member_data_merging_flag = False
 
@@ -86,6 +87,8 @@ if __name__ == '__main__':
             generate_senior_reports_flag = True
         elif opt == "--generate-graduation-reports":
             generate_graduation_reports_flag = True
+        elif opt == "--generate-predefined-senior-reports":
+            generate_predefined_senior_reports_flag = True
         else:
             print(f"Unknown option: {opt}")
             sys.exit(2)
@@ -96,23 +99,26 @@ if __name__ == '__main__':
     logger.add(cfg.logging.log_file, level=cfg.logging.level, format=cfg.logging.format)
 
     if write_access_to_mysql_flag:
-        logger.info("Writing MS Access to MySQL database...")
+        logger.info("Writing MS Access to MySQL database ...")
         write_access_to_mysql(cfg)
     elif write_google_to_mysql_flag:
-        logger.info("Writing Google spreadsheet to MySQL database...")
+        logger.info("Writing Google spreadsheet to MySQL database ...")
         write_google_to_mysql(cfg)
     elif generate_introducer_reports_flag:
-        logger.info("Generating introducer reports...")
+        logger.info("Generating introducer reports ...")
         generate_introducer_reports(cfg)
     elif generate_senior_reports_flag:
-        logger.info("Generating senior reports...")
-        generate_senior_reports(cfg)
+        logger.info("Generating senior reports ...  (from scratch)")
+        generate_senior_reports(cfg, True)
+    elif generate_predefined_senior_reports_flag:
+        logger.info("Generating graduation reports ... (from predefined)")
+        generate_senior_reports(cfg, False)
     elif member_data_merging_flag:
         logger.info("Merging member data ...")
         member_data_merging(cfg.ms_access_db.db_file, cfg.ms_access_db.target_table)
         # read_merging_data(cfg.ms_access_db.db_file, cfg.ms_access_db.target_table)
     elif generate_graduation_reports_flag:
-        logger.info("Generating graduation reports...")
+        logger.info("Generating graduation reports ... (from scratch)")
         generate_graduation_reports(cfg)
     else:
         app = QApplication([])

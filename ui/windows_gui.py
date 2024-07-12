@@ -72,7 +72,7 @@ class PyPzWindows(QMainWindow):
         try:
             self.config.make_sure_output_folder_exists()
             self.config.explorer_output_folder()
-            generate_senior_reports(self.config)
+            generate_senior_reports(self.config, True)
         except Exception as e:
             print(e)
 

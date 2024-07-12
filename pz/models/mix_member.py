@@ -1,8 +1,11 @@
+from loguru import logger
+
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
 from pz.models.new_class_senior import NewClassSeniorModel
 from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
 from pz.models.signup_next_info import SignupNextInfoModel
+from services.unique_id_allocator import UniqueIdAllocator
 
 
 class MixMember:
@@ -11,6 +14,7 @@ class MixMember:
     questionnaireInfo: PzQuestionnaireInfo | None
     signupNextInfo: SignupNextInfoModel | None
     senior: NewClassSeniorModel | None
+    unique_identifier: int
 
     def __init__(self, detail: MysqlMemberDetailEntity | None, class_member: MysqlClassMemberEntity | None,
                  questionnaire: PzQuestionnaireInfo | None, signup_next: SignupNextInfoModel | None):
@@ -19,6 +23,15 @@ class MixMember:
         self.questionnaireInfo = questionnaire
         self.signupNextInfo = signup_next
         self.senior = None
+
+        student_id = self.get_student_id()
+        if student_id is not None:
+            self.unique_identifier = student_id
+        elif self.questionnaireInfo is not None:
+            self.unique_identifier = UniqueIdAllocator.get_unique_id(
+                self.questionnaireInfo.fullName, self.questionnaireInfo.mobilePhone)
+        else:
+            raise Exception(f'嚴重錯誤: 帳號資訊不足')
 
     def is_new_student(self):
         return self.detail is None
@@ -72,7 +85,10 @@ class MixMember:
 
     def get_cha_for_tea(self) -> str:
         if self.questionnaireInfo is not None:
-            return self.questionnaireInfo.chaForTea
+            if 'chaForTea' in self.questionnaireInfo.__dict__:
+                return self.questionnaireInfo.chaForTea
+            else:
+                return ''
         else:
             return ''
 
@@ -118,3 +134,41 @@ class MixMember:
                         '上期班別/學長': last_record,
                     }
     '''
+
+    def get_gender(self):
+        if self.classMember is not None:
+            return self.classMember.gender
+        elif self.questionnaireInfo is not None:
+            return self.questionnaireInfo.gender
+        elif self.detail is not None:
+            return self.detail.gender
+        else:
+            logger.warning(f'糟糕! 沒有性別資料')
+            return ''
+
+    def is_same_person(self, the_other: 'MixMember') -> bool:
+        return self.get_unique_id() == the_other.get_unique_id()
+
+    def get_senior(self) -> str:
+        if self.classMember is not None:
+            return self.classMember.senior
+        else:
+            return ''
+
+    def get_unique_id(self) -> int:
+        return self.unique_identifier
+
+    def __eq__(self, other):
+        """
+        This method overrides the default equality comparison for Point objects.
+        """
+        if isinstance(other, MixMember):
+            return self.get_unique_id() == other.get_unique_id()
+        return False
+
+    def __hash__(self):
+        """
+        This method is often recommended alongside __eq__ for sets.
+        It defines how the object is hashed for efficient lookups.
+        """
+        return hash((self.get_unique_id(), self.get_full_name()))  # Combine x and y for hashing
