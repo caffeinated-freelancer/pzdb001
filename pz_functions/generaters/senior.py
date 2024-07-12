@@ -52,6 +52,8 @@ class SeniorReportGenerator:
         self.questionnaire_service = QuestionnaireService(config, self.member_service, self.prev_senior_service,
                                                           self.new_senior_service, self.signup_next_service)
 
+        self.fp = None
+
         if config.debug_text_file_output is not None:
             self.fp = open(config.debug_text_file_output, "w", encoding="utf-8")
 

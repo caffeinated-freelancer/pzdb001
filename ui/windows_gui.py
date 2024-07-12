@@ -16,6 +16,8 @@ from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
 from pz_functions.generaters.senior import generate_senior_reports
 from pz_functions.importers.mysql_functions import write_access_to_mysql, write_google_to_mysql
+from ui.dispatch_doc_dialog import DispatchDocDialog
+from version import __version__
 
 WINDOW_SIZE = 235
 DISPLAY_HEIGHT = 35
@@ -24,18 +26,20 @@ BUTTON_SIZE = 120
 
 class PyPzWindows(QMainWindow):
     config: PzProjectConfig
+    dispatchDocDialog: DispatchDocDialog
 
     def __init__(self, cfg: PzProjectConfig):
         super().__init__()
         self.config = cfg
-        self.setWindowTitle("普中資料管理程式")
-        self.setFixedSize(580, 450)
+        self.setWindowTitle(f'普中資料管理程式 v{__version__}')
+        self.setFixedSize(620, 500)
         self.generalLayout = QVBoxLayout()
 
         centralWidget = QWidget(self)
         centralWidget.setLayout(self.generalLayout)
         self.setCentralWidget(centralWidget)
         self._createButtons()
+        self.dispatchDocDialog = DispatchDocDialog()
 
         # layout = QHBoxLayout()
         # #
@@ -68,13 +72,24 @@ class PyPzWindows(QMainWindow):
         except Exception as e:
             print(e)
 
-    def run_senior_report(self):
+    def run_senior_report_from_scratch(self):
         try:
             self.config.make_sure_output_folder_exists()
             self.config.explorer_output_folder()
             generate_senior_reports(self.config, True)
         except Exception as e:
             print(e)
+
+    def run_senior_report(self):
+        try:
+            self.config.make_sure_output_folder_exists()
+            self.config.explorer_output_folder()
+            generate_senior_reports(self.config, False)
+        except Exception as e:
+            print(e)
+
+    def show_dispatch_doc(self):
+        self.dispatchDocDialog.show()
 
     def open_graduation_folder(self):
         explorer_folder(self.config.excel.graduation.records.spreadsheet_folder)
@@ -118,7 +133,9 @@ class PyPzWindows(QMainWindow):
             [('[產出] 禪修班結業統計', self.run_generate_graduation_reports),
              ('上課記錄 資料夾', self.open_graduation_folder)],
             [('[產出] 介紹人電聯表', self.run_introducer_report), ('意願調查 資料夾', self.open_questionnaire_folder)],
-            [('[產出] 學長電聯表', self.run_senior_report), ('學長電聯 資料夾', self.open_senior_folder)],
+            [('[產出] 學長電聯表(自動分班)', self.run_senior_report_from_scratch),
+             ('學長電聯 資料夾', self.open_senior_folder)],
+            [('[產出] 學長電聯表(人工)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
             [('Access -> MySQL', self.access_to_mysql),
              (f'Google -> {self.config.semester} 學員', self.google_to_mysql)],
             [('開啟程式設定檔', self.open_settings_in_notepad), ('輸出樣版 資料夾', self.open_template_folder)]
@@ -133,7 +150,7 @@ class PyPzWindows(QMainWindow):
                 key = k[0]
                 func = k[1]
                 self.buttonMap[key] = QPushButton(key)
-                self.buttonMap[key].setFixedSize(270, 60)
+                self.buttonMap[key].setFixedSize(300, 60)
                 self.buttonMap[key].setFont(font)
                 if func is not None:
                     # print(key)

@@ -38,6 +38,7 @@ class ClassAndGender:
     groups: dict[int, NewClassSeniorModel]
     pending_list: list[PendingEntry]
     student_ids: set[int]
+    all_followers_student_ids: set[int]
     already_assigned_students: dict[int, int]
     total_counter: int
     pending_counter: int
@@ -56,6 +57,7 @@ class ClassAndGender:
         self.pending_list = []
         self.followers = {}
         self.student_ids = set()
+        self.all_followers_student_ids = set()
         self.already_assigned_students = {}
         self.total_counter = 0
         self.pending_counter = 0
@@ -73,7 +75,12 @@ class ClassAndGender:
             logger.warning(f'班級/學長資料重覆: {group_id} at {self.name} / {self.gender}')
 
     def add_member_to(self, senior: NewClassSeniorModel, mix_member: MixMember, reason: str,
-                      step: AutoAssignmentStepEnum, deacon: str = None, internal: bool = False):
+                      assignment: AutoAssignmentStepEnum, deacon: str = None, internal: bool = False,
+                      non_follower_only: bool = False) -> bool:
+
+        if non_follower_only and mix_member.get_unique_id() in self.all_followers_student_ids:
+            logger.error(f'{self.name}/{self.gender} - {senior.fullName}/{senior.groupId} 忽略有介紹人的學員 {mix_member.get_full_name()}')
+            return False
         mix_member.senior = senior
 
         if mix_member.get_student_id() is not None:
@@ -81,12 +88,13 @@ class ClassAndGender:
                 if not internal:
                     logger.trace(
                         f'({reason}) 資料重覆: {mix_member.get_full_name()} {mix_member.get_student_id()} 已經存在 {senior.className} / {senior.gender}')
-                    return
+                    return False
             else:
                 self.student_ids.add(mix_member.get_student_id())
 
-        senior.members.append(AssignedMember(mix_member, deacon, reason))
+        senior.members.append(AssignedMember(mix_member, deacon, reason, assignment))
         self.already_assigned_students[mix_member.get_student_id()] = senior.groupId
+
         if mix_member.get_unique_id() in self.on_assignment_triggers:
             triggered_data = self.on_assignment_triggers[mix_member.get_unique_id()]
             logger.info(
@@ -98,6 +106,7 @@ class ClassAndGender:
         logger.trace(
             f'adding {mix_member.get_full_name()}/{senior.fullName} at {senior.className}/{senior.groupId}/{senior.gender}')
         self.total_counter += 1
+        return True
 
     # def min_member_first_assign(self, member: MixMember):
     #     groups = [x for x in self.groups.values()]
@@ -273,6 +282,8 @@ class ClassAndGender:
         else:
             self.followers[student_id] = [mix_member]
             self.introducers[student_id] = introducer
+
+        self.all_followers_student_ids.add(mix_member.get_unique_id())
 
         logger.debug(
             f'{self.name}/{self.gender}, followee: {introducer.real_name}/{introducer.student_id}, {len(self.followers)

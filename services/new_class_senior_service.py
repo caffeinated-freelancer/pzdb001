@@ -154,11 +154,11 @@ class NewClassSeniorService:
         return []
 
     def add_member_to(self, senior: NewClassSeniorModel, mix_member: MixMember, reason: str,
-                      step: AutoAssignmentStepEnum, deacon: str = None):
+                      step: AutoAssignmentStepEnum, deacon: str = None, non_follower_only:bool=False):
         key = self.key_of_senior(senior.className, senior.gender)
         if key in self.senior_by_class_gender:
             self.add_willingness(senior.className, mix_member)
-            self.senior_by_class_gender[key].add_member_to(senior, mix_member, reason, step, deacon=deacon)
+            self.senior_by_class_gender[key].add_member_to(senior, mix_member, reason, step, deacon=deacon, non_follower_only=non_follower_only)
         else:
             logger.error(f'錯誤!! {senior.className} {senior.gender} 班級不存在')
 

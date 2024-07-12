@@ -181,7 +181,8 @@ class SignupNextInfoService:
                     if job.className in signups:
                         reason = f'升班調查 配置 ({entry.className}/{entry.groupId}) 至原學長 {job.fullName}, 班級 {job.className}/{job.groupId}'
                         self.new_class_senior_service.add_member_to(
-                            job, mix_member, reason, AutoAssignmentStepEnum.PREVIOUS_SENIOR_FOLLOWING)
+                            job, mix_member, reason, AutoAssignmentStepEnum.PREVIOUS_SENIOR_FOLLOWING,
+                            non_follower_only=True)
                         logger.trace(reason)
                         signups.remove(job.className)
                         found = True
