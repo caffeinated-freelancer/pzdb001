@@ -135,7 +135,7 @@ class PyPzWindows(QMainWindow):
             [('[產出] 介紹人電聯表', self.run_introducer_report), ('意願調查 資料夾', self.open_questionnaire_folder)],
             [('[產出] 學長電聯表(自動分班)', self.run_senior_report_from_scratch),
              ('學長電聯 資料夾', self.open_senior_folder)],
-            [('[產出] 學長電聯表(人工)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
+            [('[x][產出] 學長電聯表(人工)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
             [('Access -> MySQL', self.access_to_mysql),
              (f'Google -> {self.config.semester} 學員', self.google_to_mysql)],
             [('開啟程式設定檔', self.open_settings_in_notepad), ('輸出樣版 資料夾', self.open_template_folder)]
