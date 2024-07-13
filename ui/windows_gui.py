@@ -1,5 +1,6 @@
 import os
 import subprocess
+import traceback
 from functools import partial
 
 from PyQt6.QtCore import Qt
@@ -7,8 +8,9 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
-    QPushButton, QVBoxLayout, QGridLayout, QLabel,
+    QPushButton, QVBoxLayout, QGridLayout, QLabel, QMessageBox,
 )
+from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz.utils import explorer_folder
@@ -27,11 +29,13 @@ BUTTON_SIZE = 120
 class PyPzWindows(QMainWindow):
     config: PzProjectConfig
     dispatchDocDialog: DispatchDocDialog
+    default_font: QFont
 
     def __init__(self, cfg: PzProjectConfig):
         super().__init__()
         self.config = cfg
         self.setWindowTitle(f'普中資料管理程式 v{__version__}')
+        self.default_font = QFont('Microsoft YaHei', 14)
         self.setFixedSize(620, 500)
         self.generalLayout = QVBoxLayout()
 
@@ -40,6 +44,8 @@ class PyPzWindows(QMainWindow):
         self.setCentralWidget(centralWidget)
         self._createButtons()
         self.dispatchDocDialog = DispatchDocDialog()
+        self.show()
+        self.activateWindow()
 
         # layout = QHBoxLayout()
         # #
@@ -72,13 +78,42 @@ class PyPzWindows(QMainWindow):
         except Exception as e:
             print(e)
 
+    def show_error_dialog(self, e: Exception):
+        message_box = QMessageBox(self)  # Set parent for proper positioning
+
+        # Set message box options (type, text, buttons)
+        message_box.setIcon(QMessageBox.Icon.Information)  # Optional: Set icon
+        message_box.setWindowTitle("糟糕")
+
+        message_box.setFont(self.default_font)
+        message_box.setText(str(e))
+        # stack_trace = traceback.format_exc()  # Get stack trace as string
+        # print(f"Exception occurred: {exception_message}")
+        # print(f"Stack Trace:\n{stack_trace}")
+
+        message_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+
+
+
+        # Show the dialog and get the user's choice (optional)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        message_box.show()
+
+        # if button_clicked == QMessageBox.StandardButton.Ok:
+        #     print("User clicked OK!")
+        # elif button_clicked == QMessageBox.StandardButton.Cancel:
+        #     print("User clicked Cancel!")
+
     def run_senior_report_from_scratch(self):
         try:
             self.config.make_sure_output_folder_exists()
             self.config.explorer_output_folder()
             generate_senior_reports(self.config, True)
         except Exception as e:
-            print(e)
+            self.show_error_dialog(e)
+            logger.error(e)
 
     def run_senior_report(self):
         try:
@@ -86,7 +121,8 @@ class PyPzWindows(QMainWindow):
             self.config.explorer_output_folder()
             generate_senior_reports(self.config, False)
         except Exception as e:
-            print(e)
+            self.show_error_dialog(e)
+            logger.error(e)
 
     def show_dispatch_doc(self):
         self.dispatchDocDialog.show()
@@ -111,13 +147,15 @@ class PyPzWindows(QMainWindow):
         try:
             write_access_to_mysql(self.config)
         except Exception as e:
-            print(e)
+            self.show_error_dialog(e)
+            logger.error(e)
 
     def google_to_mysql(self):
         try:
             write_google_to_mysql(self.config)
         except Exception as e:
-            print(e)
+            self.show_error_dialog(e)
+            logger.error(e)
 
     def open_settings_in_notepad(self):
         # Open the file content (might launch in browser on some systems)
@@ -143,7 +181,7 @@ class PyPzWindows(QMainWindow):
             # [('關懷表', self.do_nothing), ],
         ]
 
-        font = QFont('Microsoft YaHei', 14)
+        font = self.default_font
 
         for row, keys in enumerate(keyBoard):
             for col, k in enumerate(keys):

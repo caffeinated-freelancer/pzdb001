@@ -74,6 +74,9 @@ class ExcelWorkbookService:
 
         self.rehash_header()
 
+    def __del__(self):
+        self.wb.close()
+
     def rehash_header(self):
         self.headers = OrderedDict()
 
