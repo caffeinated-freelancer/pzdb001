@@ -88,9 +88,9 @@ class MixMember:
             if 'chaForTea' in self.questionnaireInfo.__dict__:
                 return self.questionnaireInfo.chaForTea
             else:
-                return ''
+                return '--'
         else:
-            return ''
+            return '-'
 
     def get_phone(self) -> str:
         if self.questionnaireInfo is not None:

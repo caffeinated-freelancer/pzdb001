@@ -87,9 +87,9 @@ class PyPzWindows(QMainWindow):
 
         message_box.setFont(self.default_font)
         message_box.setText(str(e))
-        # stack_trace = traceback.format_exc()  # Get stack trace as string
-        # print(f"Exception occurred: {exception_message}")
-        # print(f"Stack Trace:\n{stack_trace}")
+        stack_trace = traceback.format_exc()  # Get stack trace as string
+        print(f"Exception occurred: {str(e)}")
+        print(f"Stack Trace:\n{stack_trace}")
 
         message_box.setStandardButtons(QMessageBox.StandardButton.Ok)
 

@@ -3,6 +3,7 @@ from typing import Any
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from loguru import logger
 
 # SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
 # SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/drive.file",
@@ -89,6 +90,8 @@ class SpreadsheetReadingService:
 
         if spreadsheet is not None:
             headers, h_row = spreadsheet.get_headers(header_row)
+
+            logger.warning(f'headers: {headers}, {h_row}')
             # print(headers)
             # indexes = [headers.index(col_name) for col_name in col_names]
             if reverse_index:

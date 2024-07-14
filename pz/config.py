@@ -63,9 +63,18 @@ class PzProjectGoogleSpreadsheetConfig(PzProjectBaseConfig):
     semester: str
     spreadsheet_id: str
     sheet_name: str
+    fields_map: dict[str, str | list[str]] | None
 
     def __init__(self, variables: dict[str, Any]) -> None:
-        super().__init__(variables)
+        self.fields_map = None
+        super().__init__(variables, self.variable_initializer)
+
+    def variable_initializer(self, variable: str, value: Any) -> bool:
+        if variable == 'fields_map':
+            if isinstance(value, dict):
+                self.fields_map = value
+            return True
+        return False
 
 
 class PzProjectGoogleConfig(PzProjectBaseConfig):

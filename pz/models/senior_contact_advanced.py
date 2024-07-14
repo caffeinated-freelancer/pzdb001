@@ -13,6 +13,7 @@ class SeniorContactAdvanced(ExcelModelInterface):
         'dharmaName': '法名',
         'phoneNumber': '學員電話行動&市話',
         'lastRecord': '上期班別/學長',
+        'chaForTea': '喫茶趣',
     }
 
     no: int
@@ -22,6 +23,7 @@ class SeniorContactAdvanced(ExcelModelInterface):
     realName: str
     dharmaName: str
     phoneNumber: str
+    chaForTea: str
     lastRecord: str
 
     def __init__(self, values: dict[str, str]):

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class GoogleSpreadSheetModelInterface(ABC):
@@ -11,5 +12,6 @@ class GoogleSpreadSheetModelInterface(ABC):
         pass
 
     @abstractmethod
-    def new_instance(self, args) -> 'GoogleSpreadSheetModelInterface':
+    def new_instance(self, args: list[Any],
+                     remap: dict[str, str | list[str]] | None = None) -> 'GoogleSpreadSheetModelInterface':
         pass

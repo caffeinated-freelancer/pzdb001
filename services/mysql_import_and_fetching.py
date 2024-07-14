@@ -1,3 +1,5 @@
+from loguru import logger
+
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
 from pz.models.google_class_member import GoogleClassMemberModel
@@ -69,7 +71,7 @@ class MySqlImportAndFetchingService:
             service = PzCloudSpreadsheetMemberService(settings.spreadsheet_id, self.config.google.secret_file)
 
             query = (f'''
-CREATE TABLE `{self.current_table}` (
+CREATE TABLE `{self.current_table}`  (
   `id` int NOT NULL AUTO_INCREMENT,
   `student_id` int NOT NULL COMMENT '學員編號',
   `class_name` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '班級',
@@ -79,14 +81,19 @@ CREATE TABLE `{self.current_table}` (
   `dharma_name` varchar(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '法名',
   `deacon` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '執事',
   `gender` char(1) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '性別',
+  `next_classes` json DEFAULT NULL COMMENT '升班調查',
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `student_id` (`student_id`,`class_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
             ''')
 
-            self.db.perform_update(f'DROP TABLE IF EXISTS `{self.current_table}`')
-            self.db.perform_update(query)
+            try:
+                self.db.perform_update(f'DROP TABLE IF EXISTS `{self.current_table}`')
+                self.db.perform_update(query)
+            except Exception as ignored:
+                logger.error(ignored)
+                pass
 
             columns_insert = ','.join([f'`{k}`' for k in MysqlClassMemberEntity.VARIABLE_MAP.keys()])
             values_insert = ','.join(['%s' for _ in MysqlClassMemberEntity.VARIABLE_MAP.keys()])

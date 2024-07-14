@@ -67,9 +67,10 @@ class PzCloudSpreadsheetMemberService:
 
     # def get_all_members(self) ->list[PzMember]:
     #     return self.allMembers
-    def read_all(self, model: GoogleSpreadSheetModelInterface) -> list[GoogleSpreadSheetModelInterface]:
+    def read_all(self, model: GoogleSpreadSheetModelInterface, remap: dict[str, str | list[str]] | None = None) -> list[
+        GoogleSpreadSheetModelInterface]:
         results = self.service.read_sheet(model.get_spreadsheet_title(), model.get_column_names(), reverse_index=False)
-        entries = []
+        entries: list[GoogleSpreadSheetModelInterface] = []
         for result in results:
-            entries.append(GoogleClassMemberModel(result))
+            entries.append(GoogleSpreadSheetModelInterface.new_instance(result, remap))
         return entries

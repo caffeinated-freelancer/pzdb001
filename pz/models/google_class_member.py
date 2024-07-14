@@ -6,7 +6,7 @@ from pz.utils import full_name_to_real_name
 
 class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
     SPREADSHEET_TITLE = '03-活動調查(所有學員)'
-    VARIABLE_MAP = {
+    VARIABLE_MAP: dict[str, str | list[str]] = {
         'sn': '總序',
         'studentId': '學員編號\n(公式)',
         'className': '班級',
@@ -16,6 +16,7 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
         'gender': '性別',
         'senior': '學長',
         'deacon': '執事',
+        'nextClasses': ['上課班別', '第二班'],
     }
     # VARIABLE_LOCATIONS = [key for key in VARIABLE_MAP.keys()]
 
@@ -29,8 +30,9 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
     gender: str
     senior: str
     deacon: str
+    nextClasses: list[str]
 
-    def __init__(self, values: list[str]):
+    def __init__(self, values: list[str], remap: dict[str, str | list[str]] | None = None):
         # person.__dict__["age"]
         for i, value in enumerate(GoogleClassMemberModel.VARIABLE_MAP.keys()):
             if i < len(values):
@@ -40,8 +42,8 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
 
         self.realName = full_name_to_real_name(self.fullName)
 
-    def new_instance(self, args) -> 'GoogleClassMemberModel':
-        return GoogleClassMemberModel(args)
+    def new_instance(self, args: list[str], remap: dict[str, str | list[str]] | None = None) -> 'GoogleClassMemberModel':
+        return GoogleClassMemberModel(args, remap)
 
     def __str__(self):
         return f'<\'{self.studentId}\',\'{self.fullName}\',\'{self.dharmaName}\',\'{self.className}\'>'

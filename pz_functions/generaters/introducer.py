@@ -117,6 +117,7 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
                                                 entry.registerClass.startswith('兒童') else '',
             '茶會/上午': 'V' if entry.tee == '上午' else '',
             '茶會/晚上': 'V' if entry.tee == '晚上' else '',
+            '喫茶趣': entry.chaForTea if entry.chaForTea is not None else '',
         }
         introducer = member_service.find_one_class_member_by_pz_name(entry.introducerName)
 

@@ -16,6 +16,7 @@ class SeniorContactFundamental(ExcelModelInterface):
         'introducerClass': '介紹人班別/組別',
         'introducerPhone': '介紹人電話行動&市話',
         'remark': '報名時備註',
+        'chaForTea': '喫茶趣',
     }
 
     no: int
@@ -28,6 +29,7 @@ class SeniorContactFundamental(ExcelModelInterface):
     introducer: str
     introducerClass: str
     introducerPhone: str
+    chaForTea: str
     remark: str
 
     def __init__(self, values: dict[str, str]):

@@ -125,7 +125,8 @@ class ExcelTemplateService:
 
     def write_data(self, suppliers,
                    caller: Any | None = None,
-                   callback: Callable[[dict[str | int, str | int], Any, Any], tuple[Any, bool]] | None = None):
+                   callback: Callable[[dict[str | int, str | int], Any, Any], tuple[Any, bool]] | None = None,
+                   duplicate_callback: Callable[[dict[str | int, str | int], Any, Any], bool] | None = None):
         row_num = self.header_row + 1 + self.data_skip_row
         counter = 0
 
@@ -147,6 +148,10 @@ class ExcelTemplateService:
 
                 if add_page_break:
                     self.add_page_break(row_num - 1)
+
+            if duplicate_callback is not None:
+                if duplicate_callback(datum, callback_data_holder, caller):
+                    pass
 
             for column_name, index in self.headers.items():
                 self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])
