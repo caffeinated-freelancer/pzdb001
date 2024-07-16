@@ -12,6 +12,5 @@ class GoogleSpreadSheetModelInterface(ABC):
         pass
 
     @abstractmethod
-    def new_instance(self, args: list[Any],
-                     remap: dict[str, str | list[str]] | None = None) -> 'GoogleSpreadSheetModelInterface':
+    def new_instance(self, args: list[Any]) -> 'GoogleSpreadSheetModelInterface':
         pass

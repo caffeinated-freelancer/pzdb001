@@ -20,8 +20,8 @@ from services.excel_workbook_service import ExcelWorkbookService
 from ui.windows_gui import PyPzWindows
 
 
-def read_members_from_cloud(spreadsheet_id: str, secret_file: str):
-    PzCloudSpreadsheetMemberService(spreadsheet_id, secret_file)
+# def read_members_from_cloud(spreadsheet_id: str, secret_file: str):
+#     PzCloudSpreadsheetMemberService(spreadsheet_id, secret_file)
 
 
 def read_new_members_from_excel(excel_file: str, sheet_name: str):

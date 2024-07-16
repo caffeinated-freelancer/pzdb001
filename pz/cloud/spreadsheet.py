@@ -5,6 +5,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from loguru import logger
 
+from pz.config import PzProjectGoogleSpreadsheetConfig
+
 # SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
 # SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/drive.file",
 #           "https://www.googleapis.com/auth/spreadsheets"]
@@ -40,6 +42,7 @@ class Spreadsheet:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
     def get_headers(self, specify_header_row: int | None = None) -> tuple[list[str], int]:
+        logger.warning(f'frozenRowCount: {self.frozenRowCount}')
         header_row = 1 if self.frozenRowCount == 0 else self.frozenRowCount
 
         header_row = specify_header_row if specify_header_row is not None else header_row
@@ -47,22 +50,26 @@ class Spreadsheet:
         header_row_range = f"'{self.title}'!R{header_row}C1:R{header_row}C{self.columnCount}"
         # print(header_row_range)
         result = self.service.fetch_range(header_row_range)
-        return result['values'][0], header_row
+        logger.info(f'{result['values'][0]}')
+        headers = [v.replace('\n', '') for v in result['values'][0]]
+        logger.trace(f'{headers}')
+
+        return headers, header_row
 
 
 class GoogleSpreadsheetService:
     sheets: dict[str, dict[str, str | int | dict[str, int]]]
     spreadsheet_id: str
 
-    def __init__(self, spreadsheet_id: str, secret_file: str) -> None:
-        self.spreadsheet_id = spreadsheet_id
+    def __init__(self, settings: PzProjectGoogleSpreadsheetConfig, secret_file: str) -> None:
+        self.spreadsheet_id = settings.spreadsheet_id
         credentials = service_account.Credentials.from_service_account_file(secret_file, scopes=SCOPES)
         service = build("sheets", "v4", credentials=credentials)
 
         # Call the Sheets API
         self.sheet = service.spreadsheets()
 
-        result = self.sheet.get(spreadsheetId=spreadsheet_id,
+        result = self.sheet.get(spreadsheetId=self.spreadsheet_id,
                                 fields="properties.title,sheets.properties").execute()
 
         self.sheets = {entry['properties']['title']: entry['properties'] for entry in result['sheets']}
@@ -81,8 +88,8 @@ class GoogleSpreadsheetService:
 class SpreadsheetReadingService:
     service: GoogleSpreadsheetService
 
-    def __init__(self, spreadsheet_id: str, secret_file: str) -> None:
-        self.service = GoogleSpreadsheetService(spreadsheet_id, secret_file)
+    def __init__(self, settings: PzProjectGoogleSpreadsheetConfig, secret_file: str) -> None:
+        self.service = GoogleSpreadsheetService(settings, secret_file)
 
     def read_sheet(self, title: str, col_names: list[str], header_row: int | None = None,
                    reverse_index: bool = False) -> list[list[Any]]:
@@ -91,9 +98,12 @@ class SpreadsheetReadingService:
         if spreadsheet is not None:
             headers, h_row = spreadsheet.get_headers(header_row)
 
-            logger.warning(f'headers: {headers}, {h_row}')
+            logger.warning(f'headers: {header_row} {headers}, {h_row}')
             # print(headers)
             # indexes = [headers.index(col_name) for col_name in col_names]
+
+            # for col_name in col_names:
+            #     if
             if reverse_index:
                 indexes = [len(headers) - 1 - headers[::-1].index(col_name) for col_name in col_names]
             else:

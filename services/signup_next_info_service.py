@@ -62,19 +62,43 @@ class SignupNextInfoService:
             return class_name in self.signup_next_by_student_id[student_id]
         return False
 
-    def pre_processing(self):
-        workbook = ExcelWorkbookService(SignupNextInfoModel({}), self.config.excel.signup_next_info.spreadsheet_file,
-                                        header_at=self.config.excel.signup_next_info.header_row,
-                                        debug=False)
+    def db_as_signup_next(self) -> list[SignupNextInfoModel]:
+        entries: list[SignupNextInfoModel] = []
+        for member in self.member_service.all_class_members:
+            entry = SignupNextInfoModel({})
+            entry.studentId = member.student_id
+            entry.fullName = member.real_name
+            entry.dharmaName = member.dharma_name
+            entry.className = member.class_name
+            entry.groupId = member.class_group
+            entry.senior = member.senior
+            entry.signups = []
 
-        entries: list[SignupNextInfoModel] = workbook.read_all(required_attribute='fullName')
+            if member.signupClasses is not None and len(member.signupClasses) > 0:
+                entry.signups = [x for x in [ member.signupClasses] if x in self.ACCEPTABLE_SIGNUP]
+            entries.append(entry)
+        return entries
 
-        logger.info(f'{len(entries)} entries read from {self.config.excel.signup_next_info.spreadsheet_file}')
+    def pre_processing(self, from_db: bool = False):
+        if not from_db:
+            workbook = ExcelWorkbookService(SignupNextInfoModel({}), self.config.excel.signup_next_info.spreadsheet_file,
+                                            header_at=self.config.excel.signup_next_info.header_row,
+                                            debug=False)
+
+            entries: list[SignupNextInfoModel] = workbook.read_all(required_attribute='fullName')
+
+            logger.info(f'{len(entries)} entries read from {self.config.excel.signup_next_info.spreadsheet_file}')
+        else:
+            entries: list[SignupNextInfoModel] = self.db_as_signup_next()
+            logger.info(f'{len(entries)} entries read from Google local cache')
 
         self.all_signup_entries = []
 
         for entry in entries:
-            signups = set([x for x in [entry.signup1, entry.signup2] if x is not None and x in self.ACCEPTABLE_SIGNUP])
+            if not from_db:
+                signups = set([x for x in [entry.signup1, entry.signup2] if x is not None and x in self.ACCEPTABLE_SIGNUP])
+            else:
+                signups = set(entry.signups)
 
             if len(signups) == 0:
                 continue
@@ -245,3 +269,9 @@ class SignupNextInfoService:
     #                 f'{mix_member.get_full_name()} follow {student_id} ({member.get_full_name()}) at {class_name}')
     #         else:
     #             logger.error(f'{mix_member.get_full_name()} follow {student_id} at {class_name} but not found')
+    def fix_senior_willingness(self):
+        for entry in self.all_signup_entries:
+            if entry.member.classMember is not None:
+                if entry.member.classMember.senior == entry.member.get_full_name():
+                    logger.warning(f'{entry.member.classMember.to_json()}')
+

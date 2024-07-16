@@ -1,4 +1,7 @@
+from loguru import logger
+
 from pz.cloud.spreadsheet import SpreadsheetReadingService
+from pz.config import PzProjectGoogleSpreadsheetConfig
 from pz.models.google_class_member import GoogleClassMemberModel
 from pz.models.google_spreadsheet_model import GoogleSpreadSheetModelInterface
 from pz.models.pz_class import PzClass
@@ -10,10 +13,12 @@ class PzCloudSpreadsheetMemberService:
     memberByName: dict[str, list[GoogleClassMemberModel]]
     memberMap: dict[str, list[GoogleClassMemberModel]]
     allMembers: list[GoogleClassMemberModel]
+    settings: PzProjectGoogleSpreadsheetConfig
 
-    def __init__(self, spreadsheet_id: str, secret_file: str):
+    def __init__(self, settings: PzProjectGoogleSpreadsheetConfig, secret_file: str):
+        self.settings = settings
         # PzMember.get_column_names()
-        self.service = SpreadsheetReadingService(spreadsheet_id, secret_file)
+        self.service = SpreadsheetReadingService(settings, secret_file)
         # results = service.read_sheet(PzMember.get_spreadsheet_title(), PzMember.get_column_names(), reverse_index=False)
         #
         # self.memberMap = {}
@@ -53,24 +58,33 @@ class PzCloudSpreadsheetMemberService:
 
     def check_senior(self):
         for k, pz_class in self.classMap.items():
-            print(k)
+            logger.trace(f'{k}')
             for group_id, pz_class_group in pz_class.pzClassGroups.items():
                 if pz_class_group.seniorName not in self.memberByName:
-                    print("   >>>", pz_class_group.groupId, pz_class_group.seniorName, " (Not found)")
+                    logger.info(f'   >>> {pz_class_group.groupId} {pz_class_group.seniorName} (Not found)')
                 else:
                     members = self.memberByName[pz_class_group.seniorName]
                     if len(members) > 1:
-                        print("   >>>", pz_class_group.groupId, pz_class_group.seniorName,
-                              f' (Multiple match {len(members)})')
+                        logger.info(f'   >>> {pz_class_group.groupId} {pz_class_group.seniorName} (Multiple match {len(members)})')
                     else:
-                        print("   >>>", pz_class_group.groupId, pz_class_group.seniorName)
+                        logger.info(f'   >>> {pz_class_group.groupId} {pz_class_group.seniorName}')
 
     # def get_all_members(self) ->list[PzMember]:
     #     return self.allMembers
-    def read_all(self, model: GoogleSpreadSheetModelInterface, remap: dict[str, str | list[str]] | None = None) -> list[
+    def read_all(self, model: GoogleSpreadSheetModelInterface) -> list[
         GoogleSpreadSheetModelInterface]:
-        results = self.service.read_sheet(model.get_spreadsheet_title(), model.get_column_names(), reverse_index=False)
+
+        for i, col in enumerate(model.get_column_names()):
+            logger.trace(f'{i} - {col}')
+
+        results = self.service.read_sheet(model.get_spreadsheet_title(),
+                                          model.get_column_names(),
+                                          header_row=self.settings.header_row,
+                                          reverse_index=False)
+
+        # logger.warning(f'{results}')
         entries: list[GoogleSpreadSheetModelInterface] = []
         for result in results:
-            entries.append(GoogleSpreadSheetModelInterface.new_instance(result, remap))
+            logger.trace(f'{result}')
+            entries.append(GoogleClassMemberModel(result))
         return entries

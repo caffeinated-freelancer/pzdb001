@@ -72,6 +72,8 @@ class PzQuestionnaireInfo(ExcelModelInterface):
             if v in values:
                 # if values[v] is not None:
                 self.__dict__[k] = values[v]
+            else:
+                self.__dict__[k] = None
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4, ensure_ascii=False)

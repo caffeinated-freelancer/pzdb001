@@ -1,3 +1,5 @@
+import json
+
 from loguru import logger
 
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
@@ -62,13 +64,42 @@ class MySqlImportAndFetchingService:
         supplier = (lambda y=x: x for x in params)
         self.db.prepared_update(query, supplier)
 
-        print(f'>>> {len(params)} records inserted')
+        logger.info(f'>>> {len(params)} records inserted')
+
+    def _drop_table(self, table_name: str):
+        try:
+            self.db.perform_update(f'DROP TABLE IF EXISTS `{table_name}`')
+        except Exception as ignored:
+            pass
+
+    def _rename_table(self, from_name: str, to_name: str):
+        try:
+            self.db.perform_update(f'ALTER TABLE `{from_name}` RENAME TO `{to_name}`')
+        except Exception as ignored:
+            pass
+
+    def _backup_table(self):
+        number_of_backups = 3
+
+        from_table = f'{self.current_table}_{number_of_backups + 1}'
+        self._drop_table(from_table)
+
+        for i in range(number_of_backups, 0, -1):
+            try:
+                to_table = from_table
+                from_table = f'{self.current_table}_{i}'
+                self._rename_table(from_table, to_table)
+            except Exception as ignored:
+                pass
+        self._rename_table(self.current_table, from_table)
 
     def google_class_members_to_mysql(self):
         settings: PzProjectGoogleSpreadsheetConfig = self.config.google.spreadsheets.get('class_members')
 
         if settings is not None:
-            service = PzCloudSpreadsheetMemberService(settings.spreadsheet_id, self.config.google.secret_file)
+
+            GoogleClassMemberModel.remap_variables(settings.fields_map)
+            service = PzCloudSpreadsheetMemberService(settings, self.config.google.secret_file)
 
             query = (f'''
 CREATE TABLE `{self.current_table}`  (
@@ -88,17 +119,13 @@ CREATE TABLE `{self.current_table}`  (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
             ''')
 
-            try:
-                self.db.perform_update(f'DROP TABLE IF EXISTS `{self.current_table}`')
-                self.db.perform_update(query)
-            except Exception as ignored:
-                logger.error(ignored)
-                pass
+            self._backup_table()
+            self.db.perform_update(query)
 
             columns_insert = ','.join([f'`{k}`' for k in MysqlClassMemberEntity.VARIABLE_MAP.keys()])
             values_insert = ','.join(['%s' for _ in MysqlClassMemberEntity.VARIABLE_MAP.keys()])
             query = f'INSERT INTO `{self.current_table}` ({columns_insert}) VALUES ({values_insert})'
-            print(query)
+            logger.info(f'Query: {query}')
 
             members: list[GoogleClassMemberModel] = service.read_all(GoogleClassMemberModel([]))
             params = []
@@ -120,20 +147,27 @@ CREATE TABLE `{self.current_table}`  (
                             have_error = True
                     elif k == 'real_name':
                         param.append(full_name_to_real_name(value))
+                    elif k == 'next_classes':
+                        if isinstance(value, list) and len(value) > 0:
+                            param.append(json.dumps(value))
+                        # elif isinstance(value, str):
+                        #     param.append(value)
+                        else:
+                            param.append(None)
                     else:
                         param.append(value)
                 if have_error:
-                    print("Error:", param)
+                    logger.warning(f'Error: {param}')
                 else:
                     params.append(tuple(param))
 
             supplier = (lambda y=x: x for x in params)
             self.db.prepared_update(query, supplier)
 
-            print(f'>>> {len(params)} records inserted')
+            logger.info(f'>>> {len(params)} records inserted')
 
     def read_google_class_members(self) -> list[MysqlClassMemberEntity]:
-        cols, results = self.db.query(f'SELECT * FROM `{self.current_table}`')
+        cols, results = self.db.query(f'SELECT * FROM `{self.current_table}` ORDER BY class_name,class_group,id')
         entities = []
         for result in results:
             entity = MysqlClassMemberEntity(cols, result)

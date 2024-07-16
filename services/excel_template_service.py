@@ -1,6 +1,7 @@
 import os
 from typing import Callable, Any
 
+from loguru import logger
 from openpyxl.utils import get_column_letter
 
 from pz.config import PzProjectExcelSpreadsheetConfig
@@ -40,8 +41,7 @@ class ExcelTemplateService:
                                             debug=debug)
         self.headers = self.service.get_headers()
         self.header_row = self.service.get_header_row()
-        if debug:
-            print(self.headers)
+        logger.debug(f'Headers: {self.headers}')
 
     def get_headers(self) -> dict[str | int, int]:
         return self.headers
@@ -133,6 +133,10 @@ class ExcelTemplateService:
         # fonts = [self.service.get_font(row_num, i) for i in range(1, len(self.headers), 1)]
         template_cells = [PzCellProperties(self.service.get_cell(row_num + 1, i)) for i in
                           range(1, len(self.headers) + 1, 1)]
+
+        header_template_cells = [PzCellProperties(self.service.get_cell(self.header_row, i)) for i in
+                                 range(1, len(self.headers) + 1, 1)]
+
         dimension = self.service.get_row_dimensions(row_num)
 
         callback_data_holder = None
@@ -151,7 +155,13 @@ class ExcelTemplateService:
 
             if duplicate_callback is not None:
                 if duplicate_callback(datum, callback_data_holder, caller):
-                    pass
+                    for column_name, index in self.headers.items():
+                        self.service.set_cell_properties_from_pz_cell(row_num, index, header_template_cells[index - 1])
+                        header_cell_value = self.service.get_cell(self.header_row, index)
+                        self.service.write_cell(row_num, index, header_cell_value.value)
+                    self.service.set_row_dimensions(row_num, self.service.get_row_dimensions(self.header_row))
+                    row_num += 1
+                callback_data_holder = datum
 
             for column_name, index in self.headers.items():
                 self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])

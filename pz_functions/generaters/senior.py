@@ -79,9 +79,11 @@ class SeniorReportGenerator:
     def class_gender_as_key(class_name: str, gender: str) -> str:
         return f'{class_name}-{gender}'
 
-    def auto_assignment(self, spreadsheet_file: str):
+    def auto_assignment(self, spreadsheet_file: str, from_db: bool = False):
         # 預先處理, 記載每個學員的升班意願
-        self.signup_next_service.pre_processing()
+        self.signup_next_service.pre_processing(from_db=from_db)
+
+        self.signup_next_service.fix_senior_willingness()
 
         # 預先處理禪修班意願調查表, 包括讀取及連結介紹人的部份
         self.questionnaire_service.pre_processing(spreadsheet_file)
@@ -98,7 +100,6 @@ class SeniorReportGenerator:
         self.signup_next_service.add_to_pending_groups()
 
         self.new_senior_service.adding_unregistered_follower_chain()
-
 
         # 對所有的班級分配組別
         self.new_senior_service.perform_auto_assignment()
@@ -235,8 +236,8 @@ class SeniorReportGenerator:
         # template.write_data(supplier)
         template.write_data(supplier, callback=lambda x, y, z: add_page_break(x, y))
 
-    def processing_senior_report(self, spreadsheet_file: str):
-        self.auto_assignment(spreadsheet_file)
+    def processing_senior_report(self, spreadsheet_file: str, from_db: bool = False):
+        self.auto_assignment(spreadsheet_file, from_db=from_db)
 
         for class_name in self.new_senior_service.all_classes:
             if class_name in ('日初', '夜初'):
@@ -314,6 +315,9 @@ def generate_senior_reports(cfg: PzProjectConfig, from_scratch: bool):
 
     generator = SeniorReportGenerator(cfg, from_scratch)
 
+
+    from_db = cfg.willingness_source is None or cfg.willingness_source != 'excel'
+
     if not from_scratch:
         generator.read_predefined_information()
     else:
@@ -321,8 +325,8 @@ def generate_senior_reports(cfg: PzProjectConfig, from_scratch: bool):
             files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
 
             for filename in files:
-                generator.processing_senior_report(filename)
+                generator.processing_senior_report(filename, from_db=from_db)
                 generator.generate_new_class_lineup(filename)
         else:
-            generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file)
+            generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_db=from_db)
             generator.generate_new_class_lineup(cfg.excel.questionnaire.spreadsheet_file)

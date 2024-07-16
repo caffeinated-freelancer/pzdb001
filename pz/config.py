@@ -63,6 +63,7 @@ class PzProjectGoogleSpreadsheetConfig(PzProjectBaseConfig):
     semester: str
     spreadsheet_id: str
     sheet_name: str
+    header_row: int
     fields_map: dict[str, str | list[str]] | None
 
     def __init__(self, variables: dict[str, Any]) -> None:
@@ -74,6 +75,8 @@ class PzProjectGoogleSpreadsheetConfig(PzProjectBaseConfig):
             if isinstance(value, dict):
                 self.fields_map = value
             return True
+        elif variable == 'header_row':
+            self.header_row = int(value)
         return False
 
 
@@ -219,6 +222,7 @@ class PzProjectConfig(PzProjectBaseConfig):
     previous_semester: str
     debug_text_file_output: str
     logging: PzProjectLoggingConfig
+    willingness_source: str
 
     def __init__(self, filename: str, variables: dict[str, Any]) -> None:
         self.config_filename = filename

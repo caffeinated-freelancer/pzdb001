@@ -3,6 +3,8 @@ import glob
 from collections import OrderedDict
 from typing import Any
 
+from loguru import logger
+
 from pz.config import PzProjectConfig
 from pz.models.output_introducer_contact import PzIntroducerContactForOutput
 from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
@@ -61,6 +63,13 @@ def data_by_class_and_group(a: dict[str, Any], b: dict[str, Any]) -> int:
     return 0
 
 
+def duplicate_header(datum, prev_datum) -> bool:
+    if prev_datum is not None:
+        if prev_datum['介紹人'] != datum['介紹人']:
+            logger.trace(f'duplicate header {prev_datum['介紹人']} -> {datum['介紹人']}')
+            return True
+    return False
+
 def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProjectConfig, spreadsheet_file: str):
     # member_service = PzGrandMemberService(cfg, from_access=False, from_google=False)
 
@@ -102,7 +111,9 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
         phone_list = [entry.mobilePhone, entry.parentsPhone, entry.homePhone]
         phones = list(OrderedDict.fromkeys(item for item in phone_list if item))
 
-        have_register_class = entry.registerClass is not None and entry.registerClass != ''
+        have_register_class = (entry.registerClass is not None
+                               and entry.registerClass != ''
+                               and not entry.registerClass.startswith('兒童'))
 
         # print(entry.to_json())
         datum: dict[str, str | int] = {
@@ -156,7 +167,7 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
                                                     f'[介紹人電聯表][{pz_class_name}]', debug=True)
 
             supplier = (lambda y=x: x for x in sorted_list)
-            template_service.write_data(supplier)
+            template_service.write_data(supplier, duplicate_callback=lambda x, y, z: duplicate_header(x, y))
     else:
         sorted_list = sorted(data, key=functools.cmp_to_key(data_by_class_and_group))
 
@@ -164,7 +175,7 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
                                                 spreadsheet_file, cfg.output_folder, '[介紹人電聯表]', debug=True)
 
         supplier = (lambda y=x: x for x in sorted_list)
-        template_service.write_data(supplier)
+        template_service.write_data(supplier, duplicate_callback=lambda x, y, z: duplicate_header(x, y))
 
 
 def generate_introducer_reports(cfg: PzProjectConfig):

@@ -28,6 +28,7 @@ class PzGrandMemberService:
     senior_by_student_id: dict[int, MysqlClassMemberEntity]
     senior_by_class_and_group: dict[str, MysqlClassMemberEntity]
     all_seniors: list[MysqlClassMemberEntity]
+    all_class_members: list[MysqlClassMemberEntity]
 
     def __init__(self, config: PzProjectConfig, from_access: bool = False, from_google: bool = False):
         self.config = config
@@ -69,9 +70,9 @@ class PzGrandMemberService:
         self.deacon_members_by_name = OrderedDict()
         self.senior_by_student_id = {}
         self.class_members_by_student_id = {}
-        entities = fetching_function()
+        self.all_class_members = fetching_function()
 
-        for entity in entities:
+        for entity in self.all_class_members:
             if entity.real_name in self.class_members_by_name:
                 self.class_members_by_name[entity.real_name].append(entity)
             else:
@@ -272,8 +273,10 @@ class PzGrandMemberService:
     def read_class_members_from_google(self) -> list[MysqlClassMemberEntity]:
         settings: PzProjectGoogleSpreadsheetConfig = self.config.google.spreadsheets.get('class_members')
 
+        GoogleClassMemberModel.remap_variables(settings.fields_map)
+
         if settings is not None:
-            service = PzCloudSpreadsheetMemberService(settings.spreadsheet_id, self.config.google.secret_file)
+            service = PzCloudSpreadsheetMemberService(settings, self.config.google.secret_file)
             results: list[GoogleClassMemberModel] = service.read_all(GoogleClassMemberModel([]))
             entities = []
             for result in results:
