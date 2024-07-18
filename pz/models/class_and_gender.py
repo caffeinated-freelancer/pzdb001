@@ -2,6 +2,7 @@ import math
 
 from loguru import logger
 
+from debugging.check import debug_on_student_id
 from pz.models.assigned_member import AssignedMember
 from pz.models.auto_assignment_step import AutoAssignmentStepEnum
 from pz.models.mix_member import MixMember
@@ -72,14 +73,17 @@ class ClassAndGender:
         if group_id not in self.groups:
             self.groups[group_id] = senior
         else:
-            logger.warning(f'班級/學長資料重覆: {group_id} at {self.name} / {self.gender}')
+            org_senior = self.groups[group_id]
+            logger.warning(
+                f'{self.name} / {group_id} / {self.gender} 班級/學長資料重覆: {org_senior.fullName} vs {senior.fullName}')
 
     def add_member_to(self, senior: NewClassSeniorModel, mix_member: MixMember, reason: str,
                       assignment: AutoAssignmentStepEnum, deacon: str = None, internal: bool = False,
                       non_follower_only: bool = False) -> bool:
 
         if non_follower_only and mix_member.get_unique_id() in self.all_followers_student_ids:
-            logger.error(f'{self.name}/{self.gender} - {senior.fullName}/{senior.groupId} 忽略有介紹人的學員 {mix_member.get_full_name()}')
+            logger.error(
+                f'{self.name}/{self.gender} - {senior.fullName}/{senior.groupId} 忽略有介紹人的學員 {mix_member.get_full_name()}')
             return False
         mix_member.senior = senior
 
@@ -290,8 +294,16 @@ class ClassAndGender:
             } {[f'{x.get_full_name()}/{x.get_unique_id()}' for x in self.followers[student_id]]}')
 
     def add_willingness(self, mix_member: MixMember):
+        debug = debug_on_student_id(mix_member.get_unique_id())
+
         if mix_member.get_unique_id() not in self.willingness:
             self.willingness[mix_member.get_unique_id()] = mix_member
+            if debug:
+                logger.error(
+                    f'{self.name}/{self.gender} - {mix_member.get_full_name()} add to willingness {mix_member.get_debug_info()}')
+        elif debug:
+            logger.error(
+                f'{self.name}/{self.gender} - {mix_member.get_full_name()} already exists in willingness {mix_member.get_debug_info()}')
 
     def have_willingness(self, student_id: int) -> bool:
         logger.trace(f'{student_id} {"in" if student_id in self.willingness else "NOT in"} {self.name}/{self.gender}')
@@ -472,7 +484,7 @@ class ClassAndGender:
                 for m in entry.members:
                     self.add_member_to(senior, m, description, AutoAssignmentStepEnum.INTRODUCER_FOLLOWING)
                 removing_entries.append(student_id)
-                logger.warning(f'{self.name}/{self.gender} {description}')
+                logger.info(f'{self.name}/{self.gender} {description}')
             else:
                 logger.info(f'{self.name}/{self.gender} {introducer.real_name}/{student_id} {[
                     x.get_full_name() for x in entry.members]}')

@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 from typing import Any
 
 from loguru import logger
@@ -12,6 +13,7 @@ from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
 from pz.models.senior_contact_advanced import SeniorContactAdvanced
 from pz.models.senior_contact_fundamental import SeniorContactFundamental
+from pz.pz_commons import ACCEPTABLE_CLASS_NAMES
 from services.excel_template_service import ExcelTemplateService
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
@@ -79,14 +81,14 @@ class SeniorReportGenerator:
     def class_gender_as_key(class_name: str, gender: str) -> str:
         return f'{class_name}-{gender}'
 
-    def auto_assignment(self, spreadsheet_file: str, from_db: bool = False):
+    def _auto_assignment(self, spreadsheet_file: str, from_excel: bool = False):
         # 預先處理, 記載每個學員的升班意願
-        self.signup_next_service.pre_processing(from_db=from_db)
+        self.signup_next_service.pre_processing(from_excel=from_excel)
 
         self.signup_next_service.fix_senior_willingness()
 
         # 預先處理禪修班意願調查表, 包括讀取及連結介紹人的部份
-        self.questionnaire_service.pre_processing(spreadsheet_file)
+        self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=True)
 
         self.new_senior_service.perform_follower_loop_first()
 
@@ -236,8 +238,15 @@ class SeniorReportGenerator:
         # template.write_data(supplier)
         template.write_data(supplier, callback=lambda x, y, z: add_page_break(x, y))
 
-    def processing_senior_report(self, spreadsheet_file: str, from_db: bool = False):
-        self.auto_assignment(spreadsheet_file, from_db=from_db)
+    def _perform_final_report_processing(self, spreadsheet_file: str):
+        self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=False)
+        self._read_predefined_information()
+
+    def processing_senior_report(self, spreadsheet_file: str, from_excel: bool = False, from_scratch: bool = True):
+        if from_scratch:
+            self._auto_assignment(spreadsheet_file, from_excel=from_excel)
+        else:
+            self._perform_final_report_processing(spreadsheet_file)
 
         for class_name in self.new_senior_service.all_classes:
             if class_name in ('日初', '夜初'):
@@ -245,7 +254,7 @@ class SeniorReportGenerator:
             else:
                 self._generate_advanced_report(class_name, spreadsheet_file)
 
-    def read_predefined_information(self):
+    def _read_predefined_information(self):
         if self.from_scratch:
             return
 
@@ -255,8 +264,51 @@ class SeniorReportGenerator:
                                        sheet_name=spreadsheet.sheet_name,
                                        header_at=spreadsheet.header_row)
         entries: list[NewClassLineup] = service.read_all(required_attribute='realName')
+        counter = 0
+        newbies: list[NewClassLineup] = []
         for entry in entries:
-            print(entry.to_json())
+            if entry.className is None or entry.realName is None:
+                logger.error(f'資料有問題 {entry}')
+                continue
+            elif entry.className not in ACCEPTABLE_CLASS_NAMES:
+                logger.error(f'{entry.realName}: [{entry.className}] 需有班級名稱或名稱錯誤')
+                continue
+
+            latest_class = latest_senior = None
+            mix_member: MixMember | None = None
+
+
+            if entry.lastSenior is not None and re.match(r'.*/.*', entry.lastSenior):
+                latest_class, latest_senior = entry.lastSenior.split('/', 2)
+
+            if entry.studentId is not None:
+                member_tuple = self.member_service.find_grand_member_by_student_id(entry.studentId, prefer=latest_class)
+                mix_member = MixMember(member_tuple[0], member_tuple[1], None, None)
+            else:
+                self.member_service.find
+
+            if len(match_tuples) == 0:
+                match_tuples = self.member_service.find_grand_member_by_pz_name(entry.realName)
+
+            if len(match_tuples) > 0:
+                for match in match_tuples:
+                    pass
+
+            if entry.studentId is None or entry.phoneNumber is not None or entry.lastSenior is None:  # 意願調查
+                questionnaire = self.questionnaire_service.get_questionnaire(entry.realName, entry.phoneNumber)
+                if questionnaire is None:
+                    logger.warning(f'{entry.realName}: {entry.phoneNumber} 並沒有在意願調查表中')
+                else:
+                    entry.questionnaireEntry = questionnaire
+
+                newbies.append(entry)
+                counter += 1
+
+        logger.info(f'{counter} 位來自意願調查')
+
+        # newbies = sorted(newbies, key=lambda x: x.realName)
+        # for newbie in newbies:
+        #     print(f'{newbie.realName} {newbie.className} {newbie.phoneNumber} {newbie.studentId} {newbie.lastSenior}')
 
     def generate_new_class_lineup(self, filename: str):
         template_key = 'new_class_lineup'
@@ -308,25 +360,22 @@ class SeniorReportGenerator:
             template.write_data(supplier)
 
 
-def generate_senior_reports(cfg: PzProjectConfig, from_scratch: bool):
+def generate_senior_reports(cfg: PzProjectConfig, from_scratch: bool, from_excel: bool | None = None):
     if not from_scratch:
         if not os.path.exists(cfg.excel.new_class_predefined_info.spreadsheet_file):
             from_scratch = True
 
     generator = SeniorReportGenerator(cfg, from_scratch)
 
+    from_excel = False if from_excel is None else from_excel
 
-    from_db = cfg.willingness_source is None or cfg.willingness_source != 'excel'
+    if cfg.excel.questionnaire.spreadsheet_folder is not None and cfg.excel.questionnaire.spreadsheet_folder != '':
+        files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
 
-    if not from_scratch:
-        generator.read_predefined_information()
+        for filename in files:
+            generator.processing_senior_report(filename, from_excel=from_excel, from_scratch=from_scratch)
+            generator.generate_new_class_lineup(filename)
     else:
-        if cfg.excel.questionnaire.spreadsheet_folder is not None and cfg.excel.questionnaire.spreadsheet_folder != '':
-            files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
-
-            for filename in files:
-                generator.processing_senior_report(filename, from_db=from_db)
-                generator.generate_new_class_lineup(filename)
-        else:
-            generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_db=from_db)
-            generator.generate_new_class_lineup(cfg.excel.questionnaire.spreadsheet_file)
+        generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_excel=from_excel,
+                                           from_scratch=from_scratch)
+        generator.generate_new_class_lineup(cfg.excel.questionnaire.spreadsheet_file)

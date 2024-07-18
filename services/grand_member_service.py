@@ -123,10 +123,10 @@ class PzGrandMemberService:
                             pz_class_group.set_senior_id(match_list[0].student_id)
                             self.senior_by_student_id[match_list[0].student_id] = match_list[0]
                             match_list[0].is_senior = True
-                            print(
+                            logger.warning(
                                 f'Warning! Senior {pz_class_group.seniorName} ({pz_class.pzClassName} / {group_id}) multiple match')
                     else:
-                        print(
+                        logger.warning(
                             f'Warning! Senior {pz_class_group.seniorName} not found ({pz_class.pzClassName} / {group_id})')
 
     def find_member_details_by_name(self, name: str) -> list[MysqlMemberDetailEntity]:

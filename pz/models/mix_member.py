@@ -53,6 +53,14 @@ class MixMember:
         else:
             return ''
 
+    def get_debug_info(self) -> str:
+        if self.questionnaireInfo is not None:
+            return '(意願調查)'
+        elif self.classMember is not None:
+            return f'(原班 {self.classMember.class_name}/{self.classMember.class_group}/{self.classMember.senior})'
+        else:
+            return '(??)'
+
     def get_dharma_name(self) -> str:
         if self.detail is not None:
             return self.detail.dharma_name

@@ -1,4 +1,5 @@
 import pyodbc
+from loguru import logger
 
 
 class PzDatabase:
@@ -14,8 +15,7 @@ class PzDatabase:
     def __del__(self):
         # body of destructor
         self.connection.close()
-        if self.debug:
-            print("Connection closed")
+        logger.debug("Connection closed")
 
     # def copy_table_structure(self, original_table_name: str, new_table_name: str):
     #     # query = f"CREATE TABLE {new_table_name} LIKE {original_table_name}"
@@ -44,12 +44,12 @@ class PzDatabase:
         cursor = self.connection.cursor()
 
         if self.debug:
-            print(f"Update Query: {query}")
+            logger.debug(f"Update Query: {query}")
 
         cursor.execute(query)
         affected_rows = cursor.rowcount
         if self.debug:
-            print('affected rows: ', affected_rows)
+            logger.debug('affected rows: ', affected_rows)
 
         self.connection.commit()
         cursor.close()
@@ -57,7 +57,7 @@ class PzDatabase:
 
     def prepared_update(self, query: str, callback) -> int:
         if self.debug:
-            print(f"Update Query (prepared statement): {query}")
+            logger.debug(f"Update Query (prepared statement): {query}")
 
         cursor = self.connection.cursor()
         counter = 0
@@ -69,7 +69,7 @@ class PzDatabase:
                 cursor.execute(query, params)
                 counter += 1
             except pyodbc.IntegrityError:
-                print("Integrity Error", params)
+                logger.warning("Integrity Error", params)
             # print(params)
 
         self.connection.commit()
@@ -77,7 +77,7 @@ class PzDatabase:
         affected_rows = cursor.rowcount
 
         if self.debug:
-            print(f'{counter} record(s) updated successfully!')
+            logger.debug(f'{counter} record(s) updated successfully!')
         cursor.close()
         return affected_rows
 

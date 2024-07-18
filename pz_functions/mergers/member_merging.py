@@ -1,3 +1,5 @@
+from loguru import logger
+
 from services.member_merging_service import MemberMergingService
 
 
@@ -11,5 +13,5 @@ def member_data_merging(access_database: str, member_data_table: str):
 def read_merging_data(database_file: str, table_name: str):
     service = MemberMergingService(database_file, table_name)
     cols, results = service.read_all()
-    print(cols)
-    print(results)
+    logger.debug(f'{cols}')
+    logger.debug(f'{results}')

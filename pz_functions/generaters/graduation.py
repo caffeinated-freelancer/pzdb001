@@ -182,13 +182,13 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
 
                                 if value == 'F':
                                     if day not in vacation_days:
-                                        logger.warning(f'Warning! {day} (should not be F for {record.realName}) )')
+                                        logger.warning(f'糟糕! {day} 大部份的學員*不是是放香*, 但 {record.realName} 卻能放香')
                                 else:
                                     if day in vacation_days:
-                                        logger.warning(f'Warning! {day} (should be F for {record.realName})')
+                                        logger.warning(f'糟糕! {day} 大部份的學員是放香, 但 {record.realName} 是 {value}')
                             else:
                                 logger.warning(
-                                    f'Warning! {day} (got {value}, should be blank for {record.realName} / {class_name}) )')
+                                    f'{record.realName} / {class_name} 在 {day} 的記錄為 {value}, 但大部份的學員都還沒有記錄影(時間未到)')
                     else:
                         datum[date2index[day]] = ''
             # '出席V': 31, '遲到L': 32, '補課M': 33, '請假O': 34, '放香F': 35, '曠課A': 36, '全勤': 37, '勤學': 38, '結業': 39

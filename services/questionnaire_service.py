@@ -44,6 +44,7 @@ class QuestionnaireService:
     new_senior_service: NewClassSeniorService
     signup_next_service: SignupNextInfoService
     all_questionnaires_entries: list[QuestionnaireEntry]
+    questionnaire_dict: dict[str, QuestionnaireEntry]
 
     def __init__(self, config: PzProjectConfig, member_service: PzGrandMemberService,
                  prev_senior_service: PreviousSeniorService, new_senior_service: NewClassSeniorService,
@@ -54,8 +55,27 @@ class QuestionnaireService:
         self.new_senior_service = new_senior_service
         self.signup_next_service = signup_next_service
         self.all_questionnaires_entries = []
+        self.questionnaire_dict: dict[str, QuestionnaireEntry] = {}
 
-    def pre_processing(self, spreadsheet_file: str):
+    @staticmethod
+    def questionnaire_key(name: str, phone_number: str) -> str:
+        return f'{name}_{phone_number}'
+
+    def get_questionnaire(self, name: str, phone_number: str) -> QuestionnaireEntry | None:
+        key = self.questionnaire_key(name, phone_number)
+        if key in self.questionnaire_dict:
+            return self.questionnaire_dict[key]
+        return None
+
+    def save_questionnaire(self, questionnaire: QuestionnaireEntry) -> bool:
+        key = self.questionnaire_key(questionnaire.entry.fullName, questionnaire.entry.mobilePhone)
+        if key in self.questionnaire_dict:
+            logger.warning(f'{questionnaire.entry.fullName} {questionnaire.entry.mobilePhone} 意願調查資料重複')
+            return False
+        self.questionnaire_dict[key] = questionnaire
+        return True
+
+    def pre_processing(self, spreadsheet_file: str, from_scratch: bool = True):
         self.all_questionnaires_entries = []
 
         service = ExcelWorkbookService(PzQuestionnaireInfo({}), spreadsheet_file,
@@ -64,7 +84,7 @@ class QuestionnaireService:
                                        debug=False)
         entries: list[PzQuestionnaireInfo] = service.read_all(required_attribute='fullName')
 
-        logger.warning(
+        logger.debug(
             f'Assignment Step {AutoAssignmentStepEnum.INTRODUCER_AS_SENIOR} / {AutoAssignmentStepEnum.INTRODUCER_FOLLOWING}')
         for entry in entries:
             if entry.registerClass is not None and entry.registerClass != '':  # 所有有意願調查有指定班級的
@@ -80,7 +100,7 @@ class QuestionnaireService:
                     if m[0].birthday == entry.birthday and m[0].gender == entry.gender:
                         mix_member = MixMember(m[0], m[1], entry, None)
                         if m[1] is None:
-                            logger.warning(
+                            logger.info(
                                 f'舊生回歸: {name_tuple[0]} (學號: {mix_member.get_unique_id()}) -> 報名 {class_name}, 介紹人: {entry.introducerName})')
                         newbie = False
                     else:
@@ -99,6 +119,11 @@ class QuestionnaireService:
 
                 self.all_questionnaires_entries.append(
                     QuestionnaireEntry(entry, mix_member, introducer, newbie, DispatchingStatus.WAITING))
+
+        if not from_scratch:
+            for questionnaire_entry in self.all_questionnaires_entries:
+                self.save_questionnaire(questionnaire_entry)
+            return
 
         for questionnaire_entry in self.all_questionnaires_entries:
             entry = questionnaire_entry.entry
@@ -131,7 +156,8 @@ class QuestionnaireService:
                             logger.trace(
                                 f'[+] {entry.fullName} 介紹人 {introducer.real_name} 班級 {entry.registerClass}')
                     else:
-                        logger.warning(f'{entry.fullName}/{mix_member.get_unique_id()} 已經有學長 {mix_member.senior.fullName} at {entry.registerClass}')
+                        logger.debug(
+                            f'{entry.fullName}/{mix_member.get_unique_id()} 已經有學長 {mix_member.senior.fullName} at {entry.registerClass}')
 
     def assign_having_senior_questionnaire(self):
         for questionnaires_entry in self.all_questionnaires_entries:

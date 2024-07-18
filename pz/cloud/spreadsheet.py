@@ -42,7 +42,7 @@ class Spreadsheet:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
     def get_headers(self, specify_header_row: int | None = None) -> tuple[list[str], int]:
-        logger.warning(f'frozenRowCount: {self.frozenRowCount}')
+        logger.debug(f'frozenRowCount: {self.frozenRowCount}')
         header_row = 1 if self.frozenRowCount == 0 else self.frozenRowCount
 
         header_row = specify_header_row if specify_header_row is not None else header_row
@@ -50,7 +50,7 @@ class Spreadsheet:
         header_row_range = f"'{self.title}'!R{header_row}C1:R{header_row}C{self.columnCount}"
         # print(header_row_range)
         result = self.service.fetch_range(header_row_range)
-        logger.info(f'{result['values'][0]}')
+        # logger.debug(f'{result['values'][0]}')
         headers = [v.replace('\n', '') for v in result['values'][0]]
         logger.trace(f'{headers}')
 
@@ -98,7 +98,7 @@ class SpreadsheetReadingService:
         if spreadsheet is not None:
             headers, h_row = spreadsheet.get_headers(header_row)
 
-            logger.warning(f'headers: {header_row} {headers}, {h_row}')
+            logger.debug(f'headers: {header_row} {headers}, {h_row}')
             # print(headers)
             # indexes = [headers.index(col_name) for col_name in col_names]
 

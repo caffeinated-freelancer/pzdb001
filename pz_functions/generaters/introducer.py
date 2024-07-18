@@ -70,6 +70,7 @@ def duplicate_header(datum, prev_datum) -> bool:
             return True
     return False
 
+
 def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProjectConfig, spreadsheet_file: str):
     # member_service = PzGrandMemberService(cfg, from_access=False, from_google=False)
 
@@ -111,9 +112,7 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
         phone_list = [entry.mobilePhone, entry.parentsPhone, entry.homePhone]
         phones = list(OrderedDict.fromkeys(item for item in phone_list if item))
 
-        have_register_class = (entry.registerClass is not None
-                               and entry.registerClass != ''
-                               and not entry.registerClass.startswith('兒童'))
+        have_register_class = entry.registerClass is not None and entry.registerClass != ''
 
         # print(entry.to_json())
         datum: dict[str, str | int] = {
@@ -123,8 +122,7 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
             '連絡電話': "\n".join(phones),
             '報名班別': entry.registerClass if have_register_class else '',
             '說明事項': entry.remark,
-            '讀經班家長/關係': entry.parents if entry.parents is not None and
-                                                entry.registerClass is not None and
+            '讀經班家長/關係': entry.parents if entry.parents is not None and have_register_class and
                                                 entry.registerClass.startswith('兒童') else '',
             '茶會/上午': 'V' if entry.tee == '上午' else '',
             '茶會/晚上': 'V' if entry.tee == '晚上' else '',
@@ -142,7 +140,7 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
             datum['班別'] = ''
             datum['組別'] = ''
 
-        if have_register_class:
+        if have_register_class and not entry.registerClass.startswith('兒童'):
             datum['電聯註記'] = on_having_class_note
         else:
             datum['電聯註記'] = ''

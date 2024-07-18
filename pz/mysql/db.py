@@ -1,6 +1,7 @@
 from typing import Any
 
 import mysql.connector
+from loguru import logger
 from mysql.connector.abstracts import MySQLConnectionAbstract
 from mysql.connector.pooling import PooledMySQLConnection
 
@@ -82,6 +83,7 @@ class PzMysqlDatabase:
                 cursor.execute(query, params)
                 counter += 1
             except Exception as e:
+                logger.warning(f'{str(e)} : {params}')
                 print(e, params)
             # print(params)
 
@@ -90,7 +92,7 @@ class PzMysqlDatabase:
         affected_rows = cursor.rowcount
 
         if self.debug:
-            print(f'{counter} record(s) updated successfully!')
+            logger.debug(f'{counter} record(s) updated successfully!')
         cursor.close()
         return affected_rows
 
@@ -111,7 +113,7 @@ class PzMysqlDatabase:
         return column_names, all_rows
 
     def print_query(self, query: str):
-        print(query)
+        logger.debug(query)
         cursor = self.connection.cursor()
         cursor.execute(query)
 

@@ -222,7 +222,6 @@ class PzProjectConfig(PzProjectBaseConfig):
     previous_semester: str
     debug_text_file_output: str
     logging: PzProjectLoggingConfig
-    willingness_source: str
 
     def __init__(self, filename: str, variables: dict[str, Any]) -> None:
         self.config_filename = filename

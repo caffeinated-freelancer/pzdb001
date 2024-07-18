@@ -95,7 +95,10 @@ class ExcelWorkbookService:
                     if matched:
                         value = matched.group(1)
                 self.headers[value] = colNum
-                self.headers_rev[colNum] = value.strip()
+                if isinstance(value, str):
+                    self.headers_rev[colNum] = value.strip()
+                else:
+                    self.headers_rev[colNum] = value
                 self.max_column = max(self.max_column, colNum)
                 # print(value, max_column)
 
@@ -112,7 +115,7 @@ class ExcelWorkbookService:
 
     def read_all(self, required_attribute: str | None = None) -> list[ExcelModelInterface]:
         if self.debug:
-            print(self.headers)
+            logger.debug(self.headers)
         infos = []
         for rowNum in range(self.header_row + 1, self.sheet.max_row + 1, 1):
             item = {}
@@ -205,10 +208,10 @@ class ExcelWorkbookService:
     def get_column_dimension(self, col_num) -> ColumnDimension:
         column_a_width = self.sheet.column_dimensions[col_num].width
         if column_a_width is None:
-            logger.info(f"Column {col_num} width is not set explicitly.")
+            logger.debug(f"Column {col_num} width is not set explicitly.")
         else:
-            logger.info(f"Column {col_num} width: {column_a_width}")
-        logger.info(f'get column dimension for {col_num}, width: {self.sheet.column_dimensions[col_num].width}')
+            logger.debug(f"Column {col_num} width: {column_a_width}")
+        logger.debug(f'get column dimension for {col_num}, width: {self.sheet.column_dimensions[col_num].width}')
         return self.sheet.column_dimensions[col_num]
 
     def set_column_dimension(self, col_num, value: ColumnDimension):

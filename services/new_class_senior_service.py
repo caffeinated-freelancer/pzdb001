@@ -1,5 +1,6 @@
 from loguru import logger
 
+from debugging.check import debug_on_student_id
 from pz.config import PzProjectConfig
 from pz.models.auto_assignment_step import AutoAssignmentStepEnum
 from pz.models.class_and_gender import ClassAndGender
@@ -29,7 +30,7 @@ class NewClassSeniorService:
         self.all_classes = {}
         self.member_service = member_service
 
-        logger.info(f'new class seniors: {len(new_class_seniors)} record(s)')
+        logger.info(f'新班學長: {len(new_class_seniors)} 筆資料')
         self._init_new_classes_by_senior(new_class_seniors)
         self._add_new_default_member(new_class_seniors)
 
@@ -83,7 +84,7 @@ class NewClassSeniorService:
             self.all_classes[clazz].sort(key=lambda x: x.groupId)
 
     def _add_new_default_member(self, new_class_seniors: list[NewClassSeniorModel]) -> None:
-        logger.warning(f'Assignment Step {AutoAssignmentStepEnum.PREDEFINED_SENIOR}')
+        logger.debug(f'Assignment Step {AutoAssignmentStepEnum.PREDEFINED_SENIOR}')
         for entry in new_class_seniors:
             member_tuple = self.member_service.find_grand_member_by_pz_name_and_dharma_name(
                 entry.fullName, entry.dharmaName, entry.gender)
@@ -156,8 +157,11 @@ class NewClassSeniorService:
     def add_member_to(self, senior: NewClassSeniorModel, mix_member: MixMember, reason: str,
                       step: AutoAssignmentStepEnum, deacon: str = None, non_follower_only:bool=False):
         key = self.key_of_senior(senior.className, senior.gender)
+        debug = debug_on_student_id(mix_member.get_student_id())
         if key in self.senior_by_class_gender:
             self.add_willingness(senior.className, mix_member)
+            if debug:
+                logger.error(f'add_member {mix_member.get_full_name()} to {senior.fullName}')
             self.senior_by_class_gender[key].add_member_to(senior, mix_member, reason, step, deacon=deacon, non_follower_only=non_follower_only)
         else:
             logger.error(f'錯誤!! {senior.className} {senior.gender} 班級不存在')
@@ -197,7 +201,7 @@ class NewClassSeniorService:
 
         if class_gender_key in self.senior_by_class_gender:
             self.senior_by_class_gender[class_gender_key].add_to_pending([mix_member])
-        else:
+        elif signup_class != '兒童':
             logger.warning(f'糟糕! {class_gender_key} 找不到')
 
     def add_to_pending_in_group(self, signup_class: str, pending_list: list[MixMember]):
