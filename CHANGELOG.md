@@ -1,7 +1,7 @@
 
 # Change Log
  
-## [Unreleased] - 2024-7-19
+## [1.0.0] - 2024-7-24
  
 ### Added
 
