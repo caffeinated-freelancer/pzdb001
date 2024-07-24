@@ -2,6 +2,7 @@ import json
 
 from loguru import logger
 
+from pz.cloud.spreadsheet import SpreadsheetValueWithFormula
 from pz.models.google_spreadsheet_model import GoogleSpreadSheetModelInterface
 from pz.utils import full_name_to_real_name
 
@@ -42,15 +43,18 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
                     cls.VARIABLE_MAP[key] = new_mapping[key]
             logger.info(f'update class variable: {cls.VARIABLE_MAP}')
 
-    def __init__(self, values: list[str]):
+    def __init__(self, values: list[str], raw_values: list[SpreadsheetValueWithFormula] | None = None):
         # person.__dict__["age"]
 
         # logger.error(f'values: {values}')
         # if len(values) > 0:
         #     raise Exception("oops")
+        if raw_values is not None:
+            values = [x.value for x in raw_values]
 
         next_classes = []
         column_names = self.get_column_names()
+        student_id_formula = None
         for i, value in enumerate(GoogleClassMemberModel.VARIABLE_MAP.keys()):
             if i < len(values):
                 if value == 'nextClasses':
@@ -59,6 +63,10 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
                         if ii < len(values) and values[ii] is not None:
                             next_classes.append(values[ii])
                     self.nextClasses = next_classes if len(next_classes) > 0 else None
+                elif value == 'studentId':
+                    self.__dict__[value] = values[i]
+                    if raw_values is not None:
+                        student_id_formula = raw_values[i].formula
                 else:
                     self.__dict__[value] = values[i]
             else:
@@ -68,6 +76,9 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
 
         if self.nextClasses is not None:
             logger.trace(f'{self.to_json()}')
+
+        if student_id_formula is not None:
+            logger.error(f'注意! {self.realName} {self.className}/{self.classGroup} 的學號是公式 {student_id_formula}')
 
     def new_instance(self, args: list[str]) -> 'GoogleClassMemberModel':
         return GoogleClassMemberModel(args)

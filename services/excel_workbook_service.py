@@ -1,3 +1,4 @@
+import os.path
 import re
 from collections import OrderedDict
 from copy import copy
@@ -31,18 +32,21 @@ class ExcelWorkbookService:
     max_column: int
     sheet: Worksheet | Any
     debug: bool
-    wb: Workbook
+    wb: Workbook | None
     header_row: int
     ignore_parenthesis: bool
     print_header: bool
+    excel_file_name: str
 
     def __init__(self, model: ExcelModelInterface, excel_file: str, sheet_name: str | None = None,
                  header_at: int | None = None, ignore_parenthesis: bool = False, debug: bool = False,
-                 print_header: bool = False) -> None:
+                 print_header: bool = False, read_only: bool = False) -> None:
         self.ignore_parenthesis = ignore_parenthesis
         self.print_header = print_header
 
-        self.wb = openpyxl.load_workbook(excel_file)
+        self.wb = openpyxl.load_workbook(excel_file, read_only=read_only)
+
+        self.excel_file_name = os.path.basename(excel_file)
 
         self.debug = debug
         self.model: ExcelModelInterface = model
@@ -56,7 +60,7 @@ class ExcelWorkbookService:
 
         self.header_row = 1
 
-        if self.sheet.freeze_panes is not None:
+        if not read_only and self.sheet.freeze_panes is not None:
             # print(self.sheet.freeze_panes)
             frozen_row, frozen_col = coordinate_to_tuple(self.sheet.freeze_panes)
             # print(frozen_row, frozen_col)
@@ -75,7 +79,19 @@ class ExcelWorkbookService:
         self.rehash_header()
 
     def __del__(self):
-        self.wb.close()
+        self.close()
+
+    def close(self):
+        if self.wb:
+            self.wb.close()
+            logger.debug(f'關閉 Excel 檔案: {self.excel_file_name}')
+            # try:
+            #     self.wb = openpyxl.load_workbook('null')
+            # finally:
+            #     pass
+            # self.wb = openpyxl.Workbook()
+            # self.wb.close()
+            self.wb = None
 
     def rehash_header(self):
         self.headers = OrderedDict()

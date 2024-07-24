@@ -1,40 +1,18 @@
-import enum
-
 from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz.models.auto_assignment_step import AutoAssignmentStepEnum
+from pz.models.dispatching_status import DispatchingStatus
 from pz.models.mix_member import MixMember
-from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
+from pz.models.questionnaire_entry import QuestionnaireEntry
+from pz.pz_commons import phone_number_normalize
 from pz.utils import full_name_to_names
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
 from services.new_class_senior_service import NewClassSeniorService
 from services.prev_senior_service import PreviousSeniorService
 from services.signup_next_info_service import SignupNextInfoService
-
-
-class DispatchingStatus(enum.Enum):
-    WAITING = enum.auto()
-    FOLLOW = enum.auto()
-    ASSIGNED = enum.auto()
-
-
-class QuestionnaireEntry:
-    entry: PzQuestionnaireInfo
-    member: MixMember
-    introducer: MysqlClassMemberEntity | None
-    newbie: bool
-    dispatching_status: DispatchingStatus
-
-    def __init__(self, entry: PzQuestionnaireInfo, member: MixMember, introducer: MysqlClassMemberEntity | None,
-                 newbie: bool, dispatching_status: DispatchingStatus):
-        self.entry = entry
-        self.member = member
-        self.introducer = introducer
-        self.newbie = newbie
-        self.dispatching_status = dispatching_status
 
 
 class QuestionnaireService:
@@ -58,17 +36,20 @@ class QuestionnaireService:
         self.questionnaire_dict: dict[str, QuestionnaireEntry] = {}
 
     @staticmethod
-    def questionnaire_key(name: str, phone_number: str) -> str:
-        return f'{name}_{phone_number}'
+    def questionnaire_key(name: str, phone_number: str, gender: str) -> str:
+        if phone_number is None:
+            phone_number = 'None'
+        return f'{name}_{phone_number_normalize(phone_number)}_{gender}'
 
-    def get_questionnaire(self, name: str, phone_number: str) -> QuestionnaireEntry | None:
-        key = self.questionnaire_key(name, phone_number)
+    def get_questionnaire(self, name: str, phone_number: str, gender: str) -> QuestionnaireEntry | None:
+        key = self.questionnaire_key(name, phone_number, gender)
         if key in self.questionnaire_dict:
             return self.questionnaire_dict[key]
         return None
 
     def save_questionnaire(self, questionnaire: QuestionnaireEntry) -> bool:
-        key = self.questionnaire_key(questionnaire.entry.fullName, questionnaire.entry.mobilePhone)
+        key = self.questionnaire_key(questionnaire.entry.fullName, questionnaire.entry.mobilePhone,
+                                     questionnaire.entry.gender)
         if key in self.questionnaire_dict:
             logger.warning(f'{questionnaire.entry.fullName} {questionnaire.entry.mobilePhone} 意願調查資料重複')
             return False
@@ -89,6 +70,8 @@ class QuestionnaireService:
         for entry in entries:
             if entry.registerClass is not None and entry.registerClass != '':  # 所有有意願調查有指定班級的
                 class_name = entry.registerClass.replace('班', '')
+                entry.mobilePhone = phone_number_normalize(entry.mobilePhone)
+                entry.mobilePhone2 = phone_number_normalize(entry.mobilePhone2)
                 entry.registerClass = class_name
 
                 name_tuple = full_name_to_names(entry.fullName)

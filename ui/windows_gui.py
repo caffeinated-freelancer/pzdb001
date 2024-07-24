@@ -12,11 +12,14 @@ from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz.utils import explorer_folder
+from pz_functions.exporters.member_details_exporter import export_member_details
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
 from pz_functions.generaters.senior import generate_senior_reports
+from pz_functions.importers.member_details_update import member_details_update
 from pz_functions.importers.mysql_functions import write_access_to_mysql
 from ui.dispatch_doc_dialog import DispatchDocDialog
+from ui.member_import_dialog import MemberImportDialog
 from ui.senior_contact_dialog import SeniorContactDialog
 from ui.ui_commons import PzUiCommons
 from version import __version__
@@ -30,6 +33,7 @@ class PyPzWindows(QMainWindow):
     config: PzProjectConfig
     dispatchDocDialog: DispatchDocDialog
     seniorContactDialog: SeniorContactDialog
+    memberImportDialog: MemberImportDialog
     default_font: QFont
     uiCommons: PzUiCommons
 
@@ -39,7 +43,7 @@ class PyPzWindows(QMainWindow):
         self.uiCommons = PzUiCommons(self, self.config)
         self.setWindowTitle(f'普中資料管理程式 v{__version__}')
         self.default_font = QFont('Microsoft YaHei', 14)
-        self.setFixedSize(620, 500)
+        self.setFixedSize(620, 520)
         self.generalLayout = QVBoxLayout()
 
         centralWidget = QWidget(self)
@@ -50,6 +54,7 @@ class PyPzWindows(QMainWindow):
         self.seniorContactDialog = SeniorContactDialog(cfg)
         self.show()
         self.activateWindow()
+        self.memberImportDialog = MemberImportDialog(cfg)
 
         # layout = QHBoxLayout()
         # #
@@ -71,6 +76,7 @@ class PyPzWindows(QMainWindow):
         try:
             generate_graduation_reports(self.config)
             # os.startfile(self.config.output_folder)
+            self.uiCommons.done()
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
 
@@ -79,6 +85,7 @@ class PyPzWindows(QMainWindow):
             self.config.make_sure_output_folder_exists()
             self.config.explorer_output_folder()
             generate_introducer_reports(self.config)
+            self.uiCommons.done()
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
 
@@ -123,6 +130,7 @@ class PyPzWindows(QMainWindow):
             self.config.make_sure_output_folder_exists()
             self.config.explorer_output_folder()
             generate_senior_reports(self.config, False)
+            self.uiCommons.done()
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
             logger.error(e)
@@ -169,6 +177,26 @@ class PyPzWindows(QMainWindow):
         #     content = file.read()
         #     webbrowser.open('data:text/plain;charset=utf-8,' + content)
 
+    def member_info_export(self):
+        try:
+            filename = export_member_details(self.config)
+            self.uiCommons.done()
+            self.uiCommons.show_message_dialog('匯出學員基本資料', f'匯出至 {filename}')
+        except Exception as e:
+            self.uiCommons.show_error_dialog(e)
+            logger.error(e)
+
+    def member_info_import(self):
+        # self.dispatchDocDialog.exec()
+        self.memberImportDialog.exec()
+        # try:
+        #     member_details_update(self.config)
+        #     self.uiCommons.done()
+        # except Exception as e:
+        #     self.uiCommons.show_error_dialog(e)
+        #     logger.error(e)
+        # self.uiCommons.show_message_dialog('匯入/更新學員基本資料', f'完成匯入/更新學員基本資料')
+
     def _createButtons(self):
         self.buttonMap = {}
         buttonsLayout = QGridLayout()
@@ -181,7 +209,8 @@ class PyPzWindows(QMainWindow):
             [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
             [('Access -> MySQL', self.access_to_mysql),
              (f'Google 下載 {self.config.semester} 學員資料', self.google_to_mysql)],
-            [('開啟程式設定檔', self.open_settings_in_notepad), ('輸出樣版 資料夾', self.open_template_folder)]
+            [('學員基本資料 匯入', self.member_info_import), ('學員基本資料 匯出', self.member_info_export)],
+            [('開啟程式設定檔', self.open_settings_in_notepad), ('輸出樣版 資料夾', self.open_template_folder)],
             # [('開課前電聯表', self.do_nothing), ],
             # [('關懷表', self.do_nothing), ],
         ]
@@ -191,7 +220,7 @@ class PyPzWindows(QMainWindow):
                 key = k[0]
                 func = k[1]
                 self.buttonMap[key] = QPushButton(key)
-                self.buttonMap[key].setFixedSize(300, 60)
+                self.buttonMap[key].setFixedSize(300, 55)
                 self.buttonMap[key].setFont(self.uiCommons.font14)
                 if func is not None:
                     # print(key)

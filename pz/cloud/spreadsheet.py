@@ -13,6 +13,27 @@ from pz.config import PzProjectGoogleSpreadsheetConfig
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
 
+class SpreadsheetValueData:
+    value: Any
+    unformatted_value: Any
+
+    def __init__(self, value, unformatted_value):
+        self.value = value
+        self.unformatted_value = unformatted_value
+
+
+class SpreadsheetValueWithFormula:
+    value: Any
+    formula: Any
+
+    def __init__(self, value, formula):
+        self.value = value
+        self.formula = formula
+
+    def __str__(self):
+        return f"{self.value} {self.formula}"
+
+
 class Spreadsheet:
     sheetId: int
     title: str
@@ -80,8 +101,48 @@ class GoogleSpreadsheetService:
             return Spreadsheet(self, self.sheets[title])
         return None
 
-    def fetch_range(self, sheet_range: str) -> dict[str, Any]:
+    def fetch_range_with_formula(self, sheet_range: str) -> list[list[SpreadsheetValueWithFormula]]:
+        result = self.sheet.get(spreadsheetId=self.spreadsheet_id, ranges=sheet_range, includeGridData=True).execute()
+        sheets = result.get('sheets', [])
+
+        result_list: list[list[SpreadsheetValueWithFormula]] = []
+        for sheet in sheets:
+            data = sheet.get('data', [])
+            for row_idx, row_data in enumerate(data[0].get('rowData', [])):
+                row_list: list[SpreadsheetValueWithFormula] = []
+                for col_idx, cell_data in enumerate(row_data.get('values', [])):
+                    formula = cell_data.get('userEnteredValue', {}).get('formulaValue')
+                    value = cell_data.get('formattedValue')
+                    # if value is not None:
+                    row_list.append(SpreadsheetValueWithFormula(value, formula))
+                    # if formula:
+                    #     print(f'Cell {cell_address} - Value: {value}, Formula: {formula}')
+                    # elif value is not None:
+                    #     print(f'Cell {cell_address} - Value: {value}')
+                result_list.append(row_list)
+
+        return result_list
+
+    def fetch_range_with_unformatted_value(self, sheet_range: str) -> list[SpreadsheetValueData]:
         # print(sheet_range)
+        formatted_values_request = self.sheet.values().get(
+            spreadsheetId=self.spreadsheet_id, range=sheet_range, valueRenderOption='FORMATTED_VALUE'
+        )
+        formatted_values_response = formatted_values_request.execute()
+        formatted_values = formatted_values_response.get('values', [])
+
+        unformatted_values_request = self.sheet.values().get(
+            spreadsheetId=self.spreadsheet_id, range=sheet_range, valueRenderOption='UNFORMATTED_VALUE'
+        )
+        unformatted_values_response = unformatted_values_request.execute()
+        unformatted_values = unformatted_values_response.get('values', [])
+
+        data: list[SpreadsheetValueData] = []
+        for i in range(len(formatted_values)):
+            data.append(SpreadsheetValueData(formatted_values[i], unformatted_values[i]))
+        return data
+
+    def fetch_range(self, sheet_range: str) -> dict[str, Any]:
         return self.sheet.values().get(spreadsheetId=self.spreadsheet_id, range=sheet_range).execute()
 
 
@@ -92,7 +153,7 @@ class SpreadsheetReadingService:
         self.service = GoogleSpreadsheetService(settings, secret_file)
 
     def read_sheet(self, title: str, col_names: list[str], header_row: int | None = None,
-                   reverse_index: bool = False) -> list[list[Any]]:
+                   reverse_index: bool = False, read_formula: bool = False) -> list[list[SpreadsheetValueWithFormula]]:
         spreadsheet = self.service.get_sheet_by_title(title)
 
         if spreadsheet is not None:
@@ -113,23 +174,33 @@ class SpreadsheetReadingService:
 
             starting_index = min(indexes)
 
-            range = f"'{title}'!R{h_row + 1}C{starting_index + 1}:R{spreadsheet.rowCount}C{max(indexes) + 1}"
-            # result = self.service.fetch_range(f"'{self.title}'!R{header_row}C1:R{header_row}C{self.columnCount}")
+            data_range = f"'{title}'!R{h_row + 1}C{starting_index + 1}:R{spreadsheet.rowCount}C{max(indexes) + 1}"
+            logger.debug(f'range: {data_range}')
+            # result = self.service.data_range(f"'{self.title}'!R{header_row}C1:R{header_row}C{self.columnCount}")
             # print(range)
 
-            result = self.service.fetch_range(range)
-            rows = []
-            # print(indexes)
-            # print(col_names)
-            for row in result['values']:
-                if row is not None and len(row) > 0:
-                    entry = []
+            rows: list[list[SpreadsheetValueWithFormula]] = []
+
+            if read_formula:
+                results = self.service.fetch_range_with_formula(data_range)
+                for row in results:
+                    entry: list[SpreadsheetValueWithFormula] = []
                     for i in indexes:
-                        if i - starting_index < len(row):
+                        if i - starting_index <= len(row):
                             entry.append(row[i - starting_index])
-                        else:
-                            entry.append(None)
-                    # print(row)
-                    # print(entry)
-                    rows.append(entry)
+
+                    if len([x for x in entry if x.value is not None]) > 0:
+                        logger.trace(f'{[x.value for x in entry]}')
+                        rows.append(entry)
+            else:
+                result = self.service.fetch_range(data_range)
+                for row in result['values']:
+                    if row is not None and len(row) > 0:
+                        entry = []
+                        for i in indexes:
+                            if i - starting_index < len(row):
+                                entry.append(SpreadsheetValueWithFormula(row[i - starting_index], None))
+                            else:
+                                entry.append(SpreadsheetValueWithFormula(None, None))
+                        rows.append(entry)
             return rows

@@ -599,3 +599,6 @@ class PzDbOperation:
 
     def read_all_from_target(self) -> tuple[list[str], list[pyodbc.Row]]:
         return self.pzDb.query(f'SELECT * FROM {self.target_table}')
+
+    def read_all_from_table(self, table: str) -> tuple[list[str], list[pyodbc.Row]]:
+        return self.pzDb.query(f'SELECT * FROM {table}')

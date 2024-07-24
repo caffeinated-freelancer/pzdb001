@@ -70,7 +70,7 @@ class SeniorContactDialog(QDialog):
     #         self.close()
     #
     def google_to_mysql(self):
-        self.uiCommons.google_to_mysql()
+        self.uiCommons.google_to_mysql(check_formula=True)
     #     try:
     #         write_google_to_mysql(self.config)
     #     except Exception as e:

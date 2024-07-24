@@ -8,12 +8,14 @@ from PyQt6.QtWidgets import (
 )
 from loguru import logger
 
-from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
 from pz.config import PzProjectConfig
 from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
+from pz_functions.exporters.member_details_exporter import export_member_details
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
 from pz_functions.generaters.senior import generate_senior_reports
+from pz_functions.importers.member_card import import_member_card_from_access
+from pz_functions.importers.member_details_update import member_details_update
 from pz_functions.importers.mysql_functions import write_access_to_mysql, write_google_to_mysql
 from pz_functions.mergers.member_merging import member_data_merging
 from services.excel_workbook_service import ExcelWorkbookService
@@ -38,9 +40,15 @@ if __name__ == '__main__':
         "debug",
         "config=",
         "write-to-mysql",
+        "card-record-to-mysql",
         "generate-introducer-reports",
         "generate-senior-reports",
         "generate-graduation-reports",
+        "access-to-mysql",
+        "google-to-mysql",
+        "generate-predefined-senior-reports",
+        "export-details",
+        "import-details",
     ]
 
     try:
@@ -65,6 +73,9 @@ if __name__ == '__main__':
     generate_predefined_senior_reports_flag = False
     generate_graduation_reports_flag = False
     member_data_merging_flag = False
+    export_details_flag = False
+    import_details_flag = False
+    card_record_to_mysql_flag = True
 
     for opt, arg in options:
         if opt in ("-h", "--help"):
@@ -89,6 +100,12 @@ if __name__ == '__main__':
             generate_graduation_reports_flag = True
         elif opt == "--generate-predefined-senior-reports":
             generate_predefined_senior_reports_flag = True
+        elif opt == "--export-details":
+            export_details_flag = True
+        elif opt == "--import-details":
+            import_details_flag = True
+        elif opt == "--card-record-to-mysql":
+            card_record_to_mysql_flag = True
         else:
             print(f"Unknown option: {opt}")
             sys.exit(2)
@@ -96,6 +113,9 @@ if __name__ == '__main__':
     cfg = PzProjectConfig.from_yaml(config_file)
 
     cfg.make_sure_output_folder_exists()
+    logger.configure(
+        handlers=[{"sink": sys.stderr, "level": cfg.logging.level}],  # Change 'WARNING' to your desired level
+    )
     logger.add(cfg.logging.log_file, level=cfg.logging.level, format=cfg.logging.format)
 
     if write_access_to_mysql_flag:
@@ -120,6 +140,15 @@ if __name__ == '__main__':
     elif generate_graduation_reports_flag:
         logger.info("Generating graduation reports ... (from scratch)")
         generate_graduation_reports(cfg)
+    elif export_details_flag:
+        logger.info("Exporting details ...")
+        export_member_details(cfg)
+    elif import_details_flag:
+        logger.info("Importing details ...")
+        member_details_update(cfg)
+    elif card_record_to_mysql_flag:
+        logger.info("Merging card records to MySQL database ...")
+        import_member_card_from_access(cfg)
     else:
         app = QApplication([])
         # window = QWidget()

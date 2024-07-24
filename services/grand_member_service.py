@@ -1,10 +1,11 @@
+import functools
 from collections import OrderedDict
 from typing import Callable
 
 from loguru import logger
 
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
-from pz.comparators import class_member_comparator
+from pz.comparators import class_member_comparator, deacon_based_class_member_comparator
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
 from pz.models.google_class_member import GoogleClassMemberModel
 from pz.models.member_in_access import MemberInAccessDB
@@ -191,14 +192,18 @@ class PzGrandMemberService:
 
         results = []
 
-        for m1 in member_details:
-            if debug:
-                logger.warning(f'{m1.to_json()}')
+        if len(member_details) == 0 and len(class_members) > 0:
             for m2 in class_members:
+                results.append((None, m2))
+        else:
+            for m1 in member_details:
                 if debug:
-                    logger.warning(f'{m2.to_json()}')
-                if m1.id == m2.student_id:
-                    results.append((m1, m2))
+                    logger.warning(f'{m1.to_json()}')
+                for m2 in class_members:
+                    if debug:
+                        logger.warning(f'{m2.to_json()}')
+                    if m1.id == m2.student_id:
+                        results.append((m1, m2))
 
         # print(results)
         return results
@@ -262,7 +267,8 @@ class PzGrandMemberService:
         if len(results) == 1:
             return results[0]
         elif len(results) > 1:
-            sorted_list = sorted(results, key=class_member_comparator)
+            # sorted_list = sorted(results, key=class_member_comparator)
+            sorted_list = sorted(results, key=functools.cmp_to_key(deacon_based_class_member_comparator))
             return sorted_list[0]
         else:
             return None

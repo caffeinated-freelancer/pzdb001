@@ -43,6 +43,7 @@ class DispatchDocDialog(QDialog):
 最好的做法是找<font color="brown">一位同性別且意願班級相同的學員做為兩位新學員的介紹人</font>。</p>
         ''')
         button = QPushButton("關閉")
+        button.setFixedHeight(55)
         button.setFont(font)
 
         # Add widgets to layout and set layout

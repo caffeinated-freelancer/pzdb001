@@ -1,8 +1,6 @@
 import json
 from typing import Any
 
-from loguru import logger
-
 from .google_class_member import GoogleClassMemberModel
 from .json_class import JSONClass
 
@@ -20,6 +18,7 @@ class MysqlClassMemberEntity(JSONClass):
     next_classes: str
     updated_at: str
     is_senior: bool
+    some_kind_of_senior: bool
     signupClasses: list[str]
 
     VARIABLE_MAP = {
@@ -40,6 +39,8 @@ class MysqlClassMemberEntity(JSONClass):
 
     def __init__(self, columns: list[str], values: list[Any],
                  google_member_detail: GoogleClassMemberModel | None = None) -> None:
+        self.is_senior = False
+
         if google_member_detail is None:
             for i, column in enumerate(columns):
                 if column == 'updated_at':
@@ -71,5 +72,5 @@ class MysqlClassMemberEntity(JSONClass):
                     setattr(self, member_variable, google_member_detail.__dict__[google_variable])
             setattr(self, 'id', int(google_member_detail.studentId))
             # logger.warning(f'>> {self.to_json()}')
-        self.is_senior = False
 
+        self.some_kind_of_senior = self.deacon is not None and self.deacon != ''

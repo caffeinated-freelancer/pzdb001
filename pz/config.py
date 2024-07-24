@@ -177,12 +177,13 @@ class PzProjectGraduationConfig(PzProjectBaseConfig):
 
 class PzProjectExcelConfig(PzProjectBaseConfig):
     questionnaire: PzProjectExcelSpreadsheetConfig
-    new_class_lineup: PzProjectExcelSpreadsheetConfig
+    # new_class_lineup: PzProjectExcelSpreadsheetConfig
     templates: dict[str, PzProjectExcelSpreadsheetConfig]
     graduation: PzProjectGraduationConfig
     new_class_senior: PzProjectExcelSpreadsheetConfig
     signup_next_info: PzProjectExcelSpreadsheetConfig
     new_class_predefined_info: PzProjectExcelSpreadsheetConfig
+    member_details_update: PzProjectExcelSpreadsheetConfig
 
     def __init__(self, variables: dict[str, Any]) -> None:
         self.templates = {}
@@ -197,7 +198,7 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
         #     self.new_class_lineup = PzProjectExcelSpreadsheetConfig(value)
         # elif variable == 'new_class_senior':
         #     self.new_class_senior = PzProjectExcelSpreadsheetConfig(value)
-        elif variable in ('questionnaire', 'new_class_lineup', 'new_class_senior',
+        elif variable in ('questionnaire', 'new_class_senior', 'member_details_update',
                           'signup_next_info', 'new_class_predefined_info'):
             self.__setattr__(variable, PzProjectExcelSpreadsheetConfig(value))
         elif variable == 'templates':

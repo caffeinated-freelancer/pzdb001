@@ -9,3 +9,5 @@ class AutoAssignmentStepEnum(enum.Enum):
     CLASSMATE_FOLLOWING = enum.auto()
     CLASS_UPGRADE = enum.auto()
     AUTO_ASSIGNMENT = enum.auto()
+    TABLE_B_ASSIGNMENT = enum.auto()
+    TABLE_B_ALGORITHM = enum.auto()

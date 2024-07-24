@@ -47,6 +47,10 @@ def full_name_to_names(name: str) -> tuple[str, str]:
     return name, ""
 
 
+def logical_xor(a: bool, b: bool) -> bool:
+    return (a or b) and not (a and b)
+
+
 def normalize_phone_number(phone_number: str) -> tuple[str | None, bool]:
     if phone_number is None:
         return None, False

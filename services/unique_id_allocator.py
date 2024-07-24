@@ -3,8 +3,9 @@ class UniqueIdAllocator:
     id_table: dict[str, int] = {}
 
     @staticmethod
-    def get_unique_id(full_name: str, phone_number: str) -> int:
-        key = f'{full_name}_{phone_number}'
+    def get_unique_id(full_name: str, phone_number: str | None) -> int:
+
+        key = f'{full_name}_{phone_number if phone_number else 'x'}'
         if phone_number in UniqueIdAllocator.id_table:
             return UniqueIdAllocator.id_table[key]
         else:

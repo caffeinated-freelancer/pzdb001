@@ -1,7 +1,8 @@
 import json
 
 from pz.models.excel_model import ExcelModelInterface
-from services.questionnaire_service import QuestionnaireEntry
+from pz.models.mix_member import MixMember
+from pz.models.questionnaire_entry import QuestionnaireEntry
 
 
 class NewClassLineup(ExcelModelInterface):
@@ -18,7 +19,8 @@ class NewClassLineup(ExcelModelInterface):
         'gender': '性別',
         'phoneNumber': '行動電話',
         'lastSenior': '上期學長',
-        'automationInfo': '自動編班資訊',
+        'automationInfo': '備註',
+        'tableBInfo': 'B 表處理備註',
     }
 
     sn: int
@@ -30,11 +32,14 @@ class NewClassLineup(ExcelModelInterface):
     realName: str
     deacon: str
     dharmaName: str
+    gender: str
     phoneNumber: str | None
     lastSenior: str | None
-    automationInfo: str
+    automationInfo: str | None
+    tableBInfo: str | None
     # transit
-    questionnaireEntry: QuestionnaireEntry
+    questionnaireEntry: QuestionnaireEntry | None
+    mixMember: MixMember | None
 
     def __init__(self, values: dict[str, str]):
         for k, v in NewClassLineup.VARIABLE_MAP.items():

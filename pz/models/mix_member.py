@@ -1,3 +1,5 @@
+from typing import Any
+
 from loguru import logger
 
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
@@ -14,14 +16,17 @@ class MixMember:
     questionnaireInfo: PzQuestionnaireInfo | None
     signupNextInfo: SignupNextInfoModel | None
     senior: NewClassSeniorModel | None
+    newClassLineUp: Any | None
     unique_identifier: int
 
     def __init__(self, detail: MysqlMemberDetailEntity | None, class_member: MysqlClassMemberEntity | None,
-                 questionnaire: PzQuestionnaireInfo | None, signup_next: SignupNextInfoModel | None):
+                 questionnaire: PzQuestionnaireInfo | None, signup_next: SignupNextInfoModel | None,
+                 new_class_line_up: Any | None = None):
         self.detail = detail
         self.classMember = class_member
         self.questionnaireInfo = questionnaire
         self.signupNextInfo = signup_next
+        self.newClassLineUp = new_class_line_up
         self.senior = None
 
         student_id = self.get_student_id()
@@ -30,6 +35,10 @@ class MixMember:
         elif self.questionnaireInfo is not None:
             self.unique_identifier = UniqueIdAllocator.get_unique_id(
                 self.questionnaireInfo.fullName, self.questionnaireInfo.mobilePhone)
+        elif self.signupNextInfo is not None:
+            self.unique_identifier = self.signupNextInfo.studentId
+        elif self.newClassLineUp is not None:
+            self.unique_identifier = UniqueIdAllocator.get_unique_id(self.newClassLineUp.realName, self.newClassLineUp.phoneNumber)
         else:
             raise Exception(f'嚴重錯誤: 帳號資訊不足')
 
@@ -50,6 +59,10 @@ class MixMember:
             return self.questionnaireInfo.fullName
         elif self.classMember is not None:
             return self.classMember.real_name
+        elif self.signupNextInfo is not None:
+            return self.signupNextInfo.fullName
+        elif self.newClassLineUp is not None:
+            return self.newClassLineUp.realName
         else:
             return ''
 
@@ -66,6 +79,8 @@ class MixMember:
             return self.detail.dharma_name
         elif self.classMember is not None:
             return self.classMember.dharma_name
+        elif self.newClassLineUp is not None:
+            return self.newClassLineUp.dharmaName
         else:
             return ''
 
@@ -150,6 +165,8 @@ class MixMember:
             return self.questionnaireInfo.gender
         elif self.detail is not None:
             return self.detail.gender
+        elif self.newClassLineUp is not None:
+            return self.newClassLineUp.gender
         else:
             logger.warning(f'糟糕! 沒有性別資料')
             return ''

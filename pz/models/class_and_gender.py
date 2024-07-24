@@ -7,6 +7,7 @@ from pz.models.assigned_member import AssignedMember
 from pz.models.auto_assignment_step import AutoAssignmentStepEnum
 from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
+from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
 
 
@@ -50,6 +51,7 @@ class ClassAndGender:
     willingness: dict[int, MixMember]
     introducers: dict[int, MysqlClassMemberEntity]
     on_assignment_triggers: dict[int, TriggerWaitingEntry]
+    table_b_pending: list[NewClassLineup]
 
     def __init__(self, name, gender):
         self.name = name
@@ -68,6 +70,7 @@ class ClassAndGender:
         self.willingness = {}
         self.introducers = {}
         self.on_assignment_triggers = {}
+        self.table_b_pending = []
 
     def add_group(self, group_id: int, senior: NewClassSeniorModel):
         if group_id not in self.groups:
@@ -79,12 +82,14 @@ class ClassAndGender:
 
     def add_member_to(self, senior: NewClassSeniorModel, mix_member: MixMember, reason: str,
                       assignment: AutoAssignmentStepEnum, deacon: str = None, internal: bool = False,
-                      non_follower_only: bool = False) -> bool:
+                      non_follower_only: bool = False, lineup: NewClassLineup | None = None,
+                      info_b: str = '') -> bool:
 
-        if non_follower_only and mix_member.get_unique_id() in self.all_followers_student_ids:
-            logger.error(
-                f'{self.name}/{self.gender} - {senior.fullName}/{senior.groupId} 忽略有介紹人的學員 {mix_member.get_full_name()}')
-            return False
+        if lineup is None:
+            if non_follower_only and mix_member.get_unique_id() in self.all_followers_student_ids:
+                logger.error(
+                    f'{self.name}/{self.gender} - {senior.fullName}/{senior.groupId} 忽略有介紹人的學員 {mix_member.get_full_name()}')
+                return False
         mix_member.senior = senior
 
         if mix_member.get_student_id() is not None:
@@ -96,7 +101,7 @@ class ClassAndGender:
             else:
                 self.student_ids.add(mix_member.get_student_id())
 
-        senior.members.append(AssignedMember(mix_member, deacon, reason, assignment))
+        senior.members.append(AssignedMember(mix_member, deacon, reason, assignment, lineup, info_b))
         self.already_assigned_students[mix_member.get_student_id()] = senior.groupId
 
         if mix_member.get_unique_id() in self.on_assignment_triggers:
@@ -492,3 +497,34 @@ class ClassAndGender:
         if len(removing_entries) > 0:
             for student_id in removing_entries:
                 del self.on_assignment_triggers[student_id]
+
+    def add_table_b_assignment(self, group_id: int | None, entry: NewClassLineup):
+        if group_id is not None:
+            if group_id not in self.groups:
+                raise RuntimeError(f'{entry.realName} 分配的群組 {group_id} 沒有學長')
+            senior = self.groups[group_id]
+
+            logger.trace(
+                f'{self.name}/{self.gender} - {entry.realName} 依照 B 表配置至 {senior.className}/{senior.groupId}/{senior.fullName}')
+
+            self.add_member_to(senior, entry.mixMember, entry.automationInfo, AutoAssignmentStepEnum.TABLE_B_ASSIGNMENT,
+                               lineup=entry, info_b=f'B 表指定: {self.name} 群組: {group_id} (學長: {senior.fullName})')
+        else:
+            logger.debug(f'{self.name}/{self.gender} {entry.realName} 自動配組')
+            self.table_b_pending.append(entry)
+
+    def perform_table_b_auto_assignment(self):
+        while len(self.table_b_pending) > 0:
+            entry = self.table_b_pending.pop(0)
+
+            group_counters = [(group_id, len(senior.members)) for group_id, senior in self.groups.items()]
+            sorted_counters = sorted(group_counters, key=lambda x: x[1])
+            logger.trace(sorted_counters)
+
+            group_id = sorted_counters[0][0]
+
+            senior = self.groups[group_id]
+
+            self.add_member_to(senior, entry.mixMember, entry.automationInfo, AutoAssignmentStepEnum.TABLE_B_ALGORITHM,
+                               lineup=entry, info_b=f'B 表自動分配 {self.name}')
+            logger.debug(f'{self.name}/{self.gender} 分配 {entry.realName} 至 {group_id}')

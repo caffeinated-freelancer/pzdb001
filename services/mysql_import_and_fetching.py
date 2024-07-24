@@ -1,10 +1,12 @@
 import json
+import re
 
 from loguru import logger
 
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
 from pz.models.google_class_member import GoogleClassMemberModel
+from pz.models.member_detail_model import MemberDetailModel
 from pz.models.member_in_access import MemberInAccessDB
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
@@ -25,7 +27,7 @@ class MySqlImportAndFetchingService:
         self.current_table = f'class_members_{self.config.semester}'
         self.previous_table = f'class_members_{self.config.previous_semester}'
 
-    def access_db_member_to_mysql(self, service: MemberMergingService):
+    def access_db_member_to_mysql(self, service: MemberMergingService) -> int:
         # cols, results = service.read_all()
 
         columns = []
@@ -64,7 +66,8 @@ class MySqlImportAndFetchingService:
         supplier = (lambda y=x: x for x in params)
         self.db.prepared_update(query, supplier)
 
-        logger.info(f'>>> {len(params)} records inserted')
+        logger.info(f'>>> {len(params)} 筆資料匯入')
+        return len(params)
 
     def _drop_table(self, table_name: str):
         try:
@@ -93,7 +96,7 @@ class MySqlImportAndFetchingService:
                 pass
         self._rename_table(self.current_table, from_table)
 
-    def google_class_members_to_mysql(self):
+    def google_class_members_to_mysql(self, check_formula: bool = False) -> int:
         settings: PzProjectGoogleSpreadsheetConfig = self.config.google.spreadsheets.get('class_members')
 
         if settings is not None:
@@ -127,7 +130,8 @@ CREATE TABLE `{self.current_table}`  (
             query = f'INSERT INTO `{self.current_table}` ({columns_insert}) VALUES ({values_insert})'
             logger.info(f'Query: {query}')
 
-            members: list[GoogleClassMemberModel] = service.read_all(GoogleClassMemberModel([]))
+            members: list[GoogleClassMemberModel] = service.read_all(
+                GoogleClassMemberModel([]), check_formula=check_formula)
             params = []
             for member in members:
                 param = []
@@ -142,7 +146,11 @@ CREATE TABLE `{self.current_table}`  (
                         try:
                             param.append(int(value))
                         except ValueError as e:
-                            # print(f'k:[{k}], value:[{value}], error:{e}')
+                            logger.trace(f'k:[{k}], value:[{value}], error:{e}')
+                            param.append(value)
+                            have_error = True
+                        except TypeError as e:
+                            logger.trace(f'k:[{k}], value:[{value}], error:{e}')
                             param.append(value)
                             have_error = True
                     elif k == 'real_name':
@@ -164,7 +172,8 @@ CREATE TABLE `{self.current_table}`  (
             supplier = (lambda y=x: x for x in params)
             self.db.prepared_update(query, supplier)
 
-            logger.info(f'>>> {len(params)} records inserted')
+            logger.info(f'>>> {len(params)} 筆資料匯入')
+            return len(params)
 
     def read_google_class_members(self) -> list[MysqlClassMemberEntity]:
         cols, results = self.db.query(f'SELECT * FROM `{self.current_table}` ORDER BY class_name,class_group,id')
@@ -200,3 +209,31 @@ CREATE TABLE `{self.current_table}`  (
 
     def read_previous_seniors(self) -> list[MysqlClassMemberEntity]:
         return self._read_seniors_from_table(self.current_table)
+
+    def read_and_update_details(self, entry: MemberDetailModel) -> int:
+        query, params = entry.generate_query('member_details')
+        # print(query, params)
+
+        try:
+            supplier = (lambda y=x: x for x in [params])
+            affected_row = self.db.prepared_update(query, supplier)
+            return 1 if affected_row > 0 else 0
+        except Exception as e:
+            logger.error(f'Error: {e}')
+            return -1
+
+    def import_and_update(self, entries: list[MemberDetailModel]) -> tuple[int, int]:
+        count = 0
+        records = 0
+        for entry in entries:
+            if entry.student_id is not None:
+                records += 1
+                if re.match(r'\d{9}', str(entry.student_id)):
+                    affected_rows = self.read_and_update_details(entry)
+                    if affected_rows > 0:
+                        logger.info(f'學員: {entry.real_name}, 學號: {entry.student_id} 資料更新')
+                        count += affected_rows
+                else:
+                    logger.warning(f'student_id:{entry.student_id}')
+        return records, count
+

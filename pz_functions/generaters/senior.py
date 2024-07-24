@@ -13,14 +13,14 @@ from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
 from pz.models.senior_contact_advanced import SeniorContactAdvanced
 from pz.models.senior_contact_fundamental import SeniorContactFundamental
-from pz.pz_commons import ACCEPTABLE_CLASS_NAMES
+from pz.pz_commons import ACCEPTABLE_CLASS_NAMES, phone_number_normalize
 from services.excel_template_service import ExcelTemplateService
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
 from services.new_class_senior_service import NewClassSeniorService
 from services.prev_senior_service import PreviousSeniorService
 from services.questionnaire_service import QuestionnaireService
-from services.signup_next_info_service import SignupNextInfoService
+from services.signup_next_info_service import SignupNextInfoService, SignupMemberEntry
 
 
 def add_page_break(datum, prev_datum) -> tuple[Any, bool]:
@@ -239,8 +239,10 @@ class SeniorReportGenerator:
         template.write_data(supplier, callback=lambda x, y, z: add_page_break(x, y))
 
     def _perform_final_report_processing(self, spreadsheet_file: str):
+        self.signup_next_service.pre_processing(from_excel=False, for_table_b=True)
         self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=False)
         self._read_predefined_information()
+        self.new_senior_service.perform_table_b_auto_assignment()
 
     def processing_senior_report(self, spreadsheet_file: str, from_excel: bool = False, from_scratch: bool = True):
         if from_scratch:
@@ -267,6 +269,8 @@ class SeniorReportGenerator:
         counter = 0
         newbies: list[NewClassLineup] = []
         for entry in entries:
+            entry.phoneNumber = phone_number_normalize(entry.phoneNumber)
+
             if entry.className is None or entry.realName is None:
                 logger.error(f'資料有問題 {entry}')
                 continue
@@ -276,33 +280,76 @@ class SeniorReportGenerator:
 
             latest_class = latest_senior = None
             mix_member: MixMember | None = None
-
+            signup_entry: SignupMemberEntry | None = None
 
             if entry.lastSenior is not None and re.match(r'.*/.*', entry.lastSenior):
                 latest_class, latest_senior = entry.lastSenior.split('/', 2)
 
             if entry.studentId is not None:
-                member_tuple = self.member_service.find_grand_member_by_student_id(entry.studentId, prefer=latest_class)
-                mix_member = MixMember(member_tuple[0], member_tuple[1], None, None)
-            else:
-                self.member_service.find
+                signup_entry = self.signup_next_service.find_by_student_id_for_table_b(entry.studentId)
 
-            if len(match_tuples) == 0:
-                match_tuples = self.member_service.find_grand_member_by_pz_name(entry.realName)
-
-            if len(match_tuples) > 0:
-                for match in match_tuples:
-                    pass
-
-            if entry.studentId is None or entry.phoneNumber is not None or entry.lastSenior is None:  # 意願調查
-                questionnaire = self.questionnaire_service.get_questionnaire(entry.realName, entry.phoneNumber)
-                if questionnaire is None:
-                    logger.warning(f'{entry.realName}: {entry.phoneNumber} 並沒有在意願調查表中')
+                if signup_entry is None:
+                    member_tuple = self.member_service.find_grand_member_by_student_id(entry.studentId,
+                                                                                       prefer=latest_class)
+                    if member_tuple is None:
+                        logger.error(f'學員編號 {entry.studentId} 查不到資料')
+                        continue
+                    mix_member = MixMember(member_tuple[0], member_tuple[1], None, None)
                 else:
+                    mix_member = signup_entry.member
+            else:
+                member_tuple = self.member_service.find_grand_member_by_pz_name_and_dharma_name(
+                    entry.realName, entry.dharmaName, entry.gender)
+
+                if member_tuple is None:
+                    if entry.gender not in ('男', '女'):
+                        logger.error(
+                            f'姓名: {entry.realName}, 法名: {entry.dharmaName}, 沒有學號或非學員時, 性別資料是必要')
+                        continue
+                    if entry.phoneNumber is None or entry.phoneNumber == '':
+                        logger.warning(
+                            f'姓名: {entry.realName}, 法名: {entry.dharmaName}, 性別: {entry.gender} 在資料中找不到, 但同時缺少行動電話資料')
+                else:
+                    if member_tuple[1] is not None:
+                        signup_entry = self.signup_next_service.find_by_student_id_for_table_b(
+                            member_tuple[1].student_id)
+                    elif member_tuple[0] is not None:
+                        signup_entry = self.signup_next_service.find_by_student_id_for_table_b(
+                            int(member_tuple[0].student_id))
+
+                    if signup_entry is not None:
+                        mix_member = signup_entry.member
+                    else:
+                        mix_member = MixMember(member_tuple[0], member_tuple[1], None, None)
+
+            if mix_member is None or entry.studentId is None or entry.phoneNumber is not None or entry.lastSenior is None:  # 意願調查
+                questionnaire = self.questionnaire_service.get_questionnaire(entry.realName, entry.phoneNumber,
+                                                                             entry.gender)
+                if questionnaire is None:
+                    logger.warning(
+                        f'姓名: {entry.realName}, 電話: {entry.phoneNumber} 並沒有在禪修班意願調查表中, B 表中的新成員請先登錄在禪修班意願調查中')
+                    if mix_member is None:
+                        mix_member = MixMember(None, None, None, None, new_class_line_up=entry)
+                else:
+                    if mix_member is None:
+                        mix_member = questionnaire.member
+                    else:
+                        mix_member.questionnaireInfo = questionnaire.entry
                     entry.questionnaireEntry = questionnaire
 
                 newbies.append(entry)
                 counter += 1
+
+            if mix_member is None:
+                logger.error(f'程式內部錯誤, 無法對 {entry.realName} 產生學員資料結構')
+                continue
+            elif mix_member.get_full_name() == '':
+                logger.error(f'程式內部錯誤, 無法對 {entry.realName} 產生有效的學員資料結構')
+                continue
+
+            entry.mixMember = mix_member
+
+            self.new_senior_service.add_table_b_member(entry.className, entry.gender, entry.groupId, entry)
 
         logger.info(f'{counter} 位來自意願調查')
 
@@ -348,7 +395,8 @@ class SeniorReportGenerator:
                             '組別': senior.groupId,
                             '行動電話': phone,
                             '上期學長': member.get_last_record(),
-                            '自動編班資訊': assigned_member.reason if assigned_member.reason is not None else '',
+                            '備註': assigned_member.reason if assigned_member.reason is not None else '',
+                            'B 表處理備註': assigned_member.info_b
                         }
                         data.append(datum)
 

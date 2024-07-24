@@ -6,6 +6,7 @@ from pz.models.auto_assignment_step import AutoAssignmentStepEnum
 from pz.models.class_and_gender import ClassAndGender
 from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
+from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
 from pz.models.signup_next_info import SignupNextInfoModel
 from services.excel_workbook_service import ExcelWorkbookService
@@ -155,14 +156,15 @@ class NewClassSeniorService:
         return []
 
     def add_member_to(self, senior: NewClassSeniorModel, mix_member: MixMember, reason: str,
-                      step: AutoAssignmentStepEnum, deacon: str = None, non_follower_only:bool=False):
+                      step: AutoAssignmentStepEnum, deacon: str = None, non_follower_only: bool = False):
         key = self.key_of_senior(senior.className, senior.gender)
         debug = debug_on_student_id(mix_member.get_student_id())
         if key in self.senior_by_class_gender:
             self.add_willingness(senior.className, mix_member)
             if debug:
                 logger.error(f'add_member {mix_member.get_full_name()} to {senior.fullName}')
-            self.senior_by_class_gender[key].add_member_to(senior, mix_member, reason, step, deacon=deacon, non_follower_only=non_follower_only)
+            self.senior_by_class_gender[key].add_member_to(senior, mix_member, reason, step, deacon=deacon,
+                                                           non_follower_only=non_follower_only)
         else:
             logger.error(f'錯誤!! {senior.className} {senior.gender} 班級不存在')
 
@@ -222,6 +224,10 @@ class NewClassSeniorService:
             if not class_and_gender.perform_auto_assignment():
                 logger.error(f'演算法無去處理 {class_and_gender.name} / {class_and_gender.gender}')
 
+    def perform_table_b_auto_assignment(self):  # 對所有的班級分配組別
+        for class_and_gender in self.senior_by_class_gender.values():
+            class_and_gender.perform_table_b_auto_assignment()
+
     def add_willingness(self, class_name: str, mix_member: MixMember):
         class_and_gender = self.key_of_senior(class_name, mix_member.get_gender())
 
@@ -269,3 +275,13 @@ class NewClassSeniorService:
     def adding_unregistered_follower_chain(self):
         for class_and_gender in self.senior_by_class_gender.values():
             class_and_gender.processing_unregistered_follower_chain()
+
+    def add_table_b_member(self, class_name: str, gender: str, group_id: int | None, entry: NewClassLineup):
+        key = self.key_of_senior(class_name, gender)
+
+        if key not in self.senior_by_class_gender:
+            error_message = f'找不到 {class_name}/{gender} 的資料'
+            logger.error(error_message)
+            raise RuntimeError(error_message)
+        else:
+            self.senior_by_class_gender[key].add_table_b_assignment(group_id, entry)
