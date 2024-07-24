@@ -75,7 +75,7 @@ if __name__ == '__main__':
     member_data_merging_flag = False
     export_details_flag = False
     import_details_flag = False
-    card_record_to_mysql_flag = True
+    card_record_to_mysql_flag = False
 
     for opt, arg in options:
         if opt in ("-h", "--help"):

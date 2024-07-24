@@ -1,5 +1,45 @@
 
 # Change Log
+
+## [1.0.1] - 2024-7-24
+
+### Added
+- 增加 ChangeLog 關於 1.0.0 版, config.yaml 檔的修改
+- 更新 config-sample.yaml 檔 
+- config.yaml 檔增加的部份如下
+
+```yaml
+# Google 試算表相關設定
+google:
+  spreadsheets:
+    # 當前的班級成員
+    class_members:
+      # 可調整欄位名稱
+      fields_map:
+        sn: '總序'
+        studentId: '學員編號(公式)'
+        className: '班級'
+        classGroup: '組別'
+        fullName: '姓名'
+        dharmaName: '法名'
+        gender: '性別'
+        senior: '學長'
+        deacon: '執事'
+        # 可多筆升班意願
+        nextClasses:
+          - '學員上課班別'
+          - '發心上第二班禪修班'
+
+# MS Excel 的相關詋定
+excel:
+  # 學員基本資料更新
+  member_details_update:
+    spreadsheet_folder: '{WORKSPACE}\學員資料更新'
+    header_row: 1
+```
+
+### Fixed
+- 修正主程式測試用的 Flag 被開啟的問題
  
 ## [1.0.0] - 2024-7-24
  

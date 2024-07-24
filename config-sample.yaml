@@ -9,44 +9,145 @@ output_folder: '{USERPROFILE}\Desktop\程式產出資料夾'
 # 輸出樣版
 template_folder: '{WORKSPACE}\輸出樣本及參數設定'
 
+debug_text_file_output: '{OUTPUT_FOLDER}\output.txt'
+
 # 本學期
 semester: '113_1'
 # 上學期
 previous_semester: '112_2'
 
+logging:
+  level: DEBUG
+  log_file: '{OUTPUT_FOLDER}\log-file.txt'
+  format: '{time} - {level} - {message}'
 
+# MySQL 資料庫連線設定
 mysql:
-  user: 'user'
-  password: 'password'
+  user: 'database_user'
+  password: 'database_password'
   host: 'localhost'
-  database: 'database'
+  database: 'database_name'
 
+# MS-Access 資料庫的設定
 ms_access_db:
-  db_file: "access_database.accdb"
+  db_file: '{WORKSPACE}\AccessDB\theAccessDb.accdb'
   target_table: 'MemberData'
 
+# Google 試算表相關設定
 google:
-  secret_file: 'google_credential.json'
+  # Google 試算表讀取認證用
+  secret_file: 'C:/path/to/google/credential.json'
   spreadsheets:
+    # 當前的班級成員
     class_members:
       semester: '113-1'
-      spreadsheet_id: 'the_spread_sheet_id'
-      sheet_name: 'sheet_name'
+      spreadsheet_id: 'the_spread_id'
+      sheet_name: 'the_sheet_name'
+      header_row: 2
+      fields_map:
+        sn: '總序'
+        studentId: '學員編號(公式)'
+        className: '班級'
+        classGroup: '組別'
+        fullName: '姓名'
+        dharmaName: '法名'
+        gender: '性別'
+        senior: '學長'
+        deacon: '執事'
+        nextClasses:
+          - '學員上課班別'
+          - '發心上第二班禪修班'
 
+# MS Excel 的相關詋定
 excel:
+  # 輸出様版
   templates:
+    # 介紹人電聯表
     introducer:
-      spreadsheet_file: 'spreadsheet_file1.xlsx'
+      spreadsheet_file: '{TEMPLATE}\介紹人電聯表範本.xlsx'
       header_row: 2
-    senior:
-      spreadsheet_file: 'spreadsheet_file2.xlsx'
+    # 初級班學長電聯表樣本
+    fundamental_contact:
+      spreadsheet_file: '{TEMPLATE}\初級班_學長電聯表.xlsx'
       header_row: 2
+    # 非初級班學長電聯表樣本
+    advanced_contact:
+      spreadsheet_file: '{TEMPLATE}\非初級班_學長電聯表.xlsx'
+      header_row: 2
+    # 新編班資料樣本
+    new_class_lineup:
+      spreadsheet_file: '{TEMPLATE}\新編班資料-樣版.xlsx'
+      header_row: 1
+  # 禪修班意願調查表
   questionnaire:
-    spreadsheet_file: 'spreadsheet_file3.xlsx'
-    spreadsheet_folder: 'path_to_spreadsheet'
-    sheet_name: 'sheet_name'
+    # 意願調查放置的資料夾
+    spreadsheet_folder: '{WORKSPACE}\禪修班意願調查表'
+    sheet_name: '意願調查彙整表'
     header_row: 2
-  new_class_lineup:
-    spreadsheet_file: ''
-    sheet_name: ''
+    additional_notes:
+      '按班級拆檔案': True
+      '已有班級電聯註記': '由學長連絡'
+  # 新的編班學長資料
+  new_class_senior:
+    spreadsheet_file: '{WORKSPACE}\學長電聯表\各班學長總名單.xlsx'
     header_row: 2
+  # 升班調查資料
+  signup_next_info:
+    spreadsheet_file: '{WORKSPACE}\學長電聯表\學長調查回報-升班調查.xlsx'
+    header_row: 2
+  # 新班完成資料 (B 表)
+  new_class_predefined_info:
+    spreadsheet_file: '{WORKSPACE}\學長電聯表\新編班人工調整完成名單.xlsx'
+    header_row: 1
+  # 學員基本資料更新
+  member_details_update:
+    spreadsheet_folder: '{WORKSPACE}\學員資料更新'
+    header_row: 1
+  # 結業統計 (根據上課記錄）
+  graduation:
+    # 上課記錄
+    records:
+      spreadsheet_folder: '{WORKSPACE}\上課記錄'
+      ignore_parenthesis: True
+      header_row: 2
+    # 結業標準
+    standards:
+      spreadsheet_file: '{TEMPLATE}\結業統計-參數設定.xlsx'
+    # 輸出樣版
+    template:
+      spreadsheet_file: '{TEMPLATE}\結業統計-樣版.xlsx'
+      header_row: 2
+      data_skip_row: 1
+      additional_notes:
+        '結業在即': '保持'
+        '結業預警': '請補課'
+    #      insert_row_after: 10
+    # 禪修班結業規則
+    graduation_standards:
+      '21':
+        # 實體 >= 10, 缺課 <=3, 實體 + 補課 >= 18
+        - "V + L >= 10"
+        - "A + O + _ <= 3"
+        - "V + L + M >= 18"
+      '20':
+        # 實體 >= 10, 缺課 <=3, 實體 + 補課 >= 17
+        - "V + L >= 10"
+        - "A + O + _ <= 3"
+        - "V + L + M >= 17"
+      '19':
+        - "V + L >= 10"
+        - "A + O + _ <= 3"
+        - "V + L + M >= 16"
+      '18':
+        - "V + L >= 9"
+        - "A + O + _ <= 3"
+        - "V + L + M >= 15"
+      '17':
+        - "V + L >= 9"
+        - "A + O + _ <= 3"
+        - "V + L + M >= 14"
+      '16':
+        - "V + L >= 8"
+        - "A + O + _ <= 3"
+        - "V + L + M >= 13"
+
