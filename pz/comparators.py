@@ -1,4 +1,5 @@
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
+from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
 from pz.models.new_class_senior import NewClassSeniorModel
 from pz.utils import logical_xor
 
@@ -31,6 +32,18 @@ def deacon_based_class_member_comparator(a: MysqlClassMemberEntity, b: MysqlClas
     elif a.some_kind_of_senior:
         return -1
     elif b.some_kind_of_senior:
+        return 1
+    return 0
+
+
+def deacon_based_class_member_comparator_for_tuple(
+        a: tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity],
+        b: tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity]) -> int:
+    if not logical_xor(a[1].some_kind_of_senior, b[1].some_kind_of_senior):
+        return class_member_comparator(a[1]) - class_member_comparator(b[1])
+    elif a[1].some_kind_of_senior:
+        return -1
+    elif b[1].some_kind_of_senior:
         return 1
     return 0
 

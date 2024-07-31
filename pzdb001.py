@@ -13,6 +13,7 @@ from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
 from pz_functions.exporters.member_details_exporter import export_member_details
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
+from pz_functions.generaters.member_comparison import generate_member_comparison_table
 from pz_functions.generaters.senior import generate_senior_reports
 from pz_functions.importers.member_card import import_member_card_from_access
 from pz_functions.importers.member_details_update import member_details_update
@@ -44,6 +45,7 @@ if __name__ == '__main__':
         "generate-introducer-reports",
         "generate-senior-reports",
         "generate-graduation-reports",
+        "generate-member-comparison",
         "access-to-mysql",
         "google-to-mysql",
         "generate-predefined-senior-reports",
@@ -57,13 +59,29 @@ if __name__ == '__main__':
         print(f"Error parsing options: {err}")
         sys.exit(2)
 
-    default_config_file = r'C:\Applications\pzdb001\config.yaml'
+    default_config_file = r'config.yaml'
 
-    if not Path(default_config_file).exists():
-        default_config_file = r'\\NS-Puzhong2\資料組\禪修程式檔\config.yaml'
+    default_config_files: list[str] = [
+        r'config.yaml',
+        r'C:\Applications\pzdb001\config.yaml',
+        r'\\NS-Puzhong2\資料組\禪修程式檔\config.yaml'
+    ]
+
+    for cfg_file in default_config_files:
+        if Path(cfg_file).exists():
+            default_config_file = cfg_file
+            break
+
+    # if not Path(default_config_file).exists():
+    #     if Path('config.yaml').exists():
+    #         default_config_file=Path('config.yaml').absolute()
+    #     else:
+    #         default_config_file = r'\\NS-Puzhong2\資料組\禪修程式檔\config.yaml'
 
     # config_file = os.getenv('PZDB_CONFIG', r'\\NS-Puzhong2\資料組\禪修程式檔\config.yaml')
     config_file = os.getenv('PZDB_CONFIG', default_config_file)
+
+    logger.info(f'read config file from: {config_file}')
     verbose = False
     debug = False
     write_access_to_mysql_flag = False
@@ -76,6 +94,7 @@ if __name__ == '__main__':
     export_details_flag = False
     import_details_flag = False
     card_record_to_mysql_flag = False
+    generate_member_comparison_flag = False
 
     for opt, arg in options:
         if opt in ("-h", "--help"):
@@ -133,6 +152,9 @@ if __name__ == '__main__':
     elif generate_predefined_senior_reports_flag:
         logger.info("Generating graduation reports ... (from predefined)")
         generate_senior_reports(cfg, False)
+    elif generate_member_comparison_flag:
+        logger.info("Generating member comparison ...")
+        generate_member_comparison_table(cfg)
     elif member_data_merging_flag:
         logger.info("Merging member data ...")
         member_data_merging(cfg.ms_access_db.db_file, cfg.ms_access_db.target_table)

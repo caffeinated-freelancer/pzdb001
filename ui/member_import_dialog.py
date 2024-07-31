@@ -8,7 +8,7 @@ from pz.config import PzProjectConfig
 from pz.utils import explorer_folder
 from pz_functions.importers.member_details_update import member_details_update
 from ui.ui_commons import PzUiCommons
-from version import __version__
+from version import __pz_version__
 
 
 class MemberImportDialog(QDialog):
@@ -19,7 +19,7 @@ class MemberImportDialog(QDialog):
         self.config = cfg
         self.uiCommons = PzUiCommons(self, self.config)
         super().__init__()
-        self.setWindowTitle(f'學員基本資料匯入 {__version__}')
+        self.setWindowTitle(f'學員基本資料匯入 v{__pz_version__}')
 
         self.resize(550, 600)
 

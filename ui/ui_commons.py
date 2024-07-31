@@ -1,7 +1,7 @@
 import traceback
 
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QMessageBox, QWidget
+from PyQt6.QtWidgets import QMessageBox, QWidget, QPushButton
 from loguru import logger
 
 from pz.config import PzProjectConfig
@@ -12,15 +12,18 @@ from pz_functions.importers.mysql_functions import write_google_to_mysql
 class PzUiCommons:
     widget: QWidget
     config: PzProjectConfig
-    font10: QFont
-    font14: QFont
+    font10 = QFont('Microsoft YaHei', 10)
+    font12 = QFont('Microsoft YaHei', 12)
+    font14 = QFont('Microsoft YaHei', 14)
+    font16 = QFont('Microsoft YaHei', 16)
 
     def __init__(self, widget: QWidget, cfg: PzProjectConfig) -> None:
         self.widget = widget
         self.config = cfg
 
-        self.font14 = QFont('Microsoft YaHei', 14)
-        self.font10 = QFont('Microsoft YaHei', 10)
+        # self.font10 = QFont('Microsoft YaHei', 10)
+        # self.font12 = QFont('Microsoft YaHei', 12)
+        # self.font14 = QFont('Microsoft YaHei', 14)
 
     def show_error_dialog(self, e: Exception):
         message_box = QMessageBox(self.widget)  # Set parent for proper positioning
@@ -42,6 +45,14 @@ class PzUiCommons:
         self.widget.raise_()
         self.widget.activateWindow()
         message_box.show()
+
+    @staticmethod
+    def create_a_button(text: str, button_width: int = 300, button_height: int = 60,
+                        font: QFont = font14) -> QPushButton:
+        button = QPushButton(text)
+        button.setFixedSize(button_width, button_height)
+        button.setFont(font)
+        return button
 
     def show_message_dialog(self, title: str, message: str):
         message_box = QMessageBox(self.widget)  # Set parent for proper positioning

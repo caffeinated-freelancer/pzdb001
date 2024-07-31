@@ -1,3 +1,4 @@
+import datetime
 import os
 import re
 
@@ -47,8 +48,21 @@ def full_name_to_names(name: str) -> tuple[str, str]:
     return name, ""
 
 
+def names_to_pz_full_name(real_name: str, dharma_name: str | None) -> str:
+    full_name = real_name
+    if dharma_name is not None and dharma_name != "":
+        full_name = f'{real_name}({dharma_name})'
+    return full_name
+
+
 def logical_xor(a: bool, b: bool) -> bool:
     return (a or b) and not (a and b)
+
+
+def get_formatted_datetime() -> str:
+    now = datetime.datetime.now()
+    formatted_date_time = now.strftime("%Y-%m-%d_%H-%M-%S")
+    return formatted_date_time
 
 
 def normalize_phone_number(phone_number: str) -> tuple[str | None, bool]:

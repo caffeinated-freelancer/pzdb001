@@ -1,76 +1,53 @@
 import os
-from functools import partial
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QPushButton, QLabel
+from PyQt6.QtWidgets import QDialog, QLabel
 
 from pz.config import PzProjectConfig
+from ui.dispatch_doc_dialog import DispatchDocDialog
 from ui.ui_commons import PzUiCommons
+from ui.ui_utils import style101_dialog_layout
 
 
 class SeniorContactDialog(QDialog):
     config: PzProjectConfig
     uiCommons: PzUiCommons
+    dispatchDocDialog: DispatchDocDialog
 
     def __init__(self, cfg: PzProjectConfig):
         self.config = cfg
         self.uiCommons = PzUiCommons(self, self.config)
         super().__init__()
+
+        self.dispatchDocDialog = DispatchDocDialog()
+
         self.setWindowTitle(f'[產出] 學長電聯表(自動分班)')
 
         self.resize(400, 250)
-
-        # Create layout and widgets
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-
-        button_sync = QPushButton(f'Google 下載 {self.config.semester} 學員資料')
-        button_sync.setMinimumHeight(300)
-        button_sync.setMinimumHeight(60)
-        button_sync.setFont(self.uiCommons.font14)
-        button_sync.clicked.connect(partial(self.google_to_mysql))
-
-        button1 = QPushButton('讀取 Google 上的升班調查')
-        button1.setMinimumHeight(300)
-        button1.setMinimumHeight(60)
-        button1.setFont(self.uiCommons.font14)
-        button1.clicked.connect(partial(self.run_senior_report_from_google))
 
         file_name = os.path.basename(cfg.excel.signup_next_info.spreadsheet_file)
         label = QLabel(f'Excel 檔: {file_name}')
         label.setFont(self.uiCommons.font10)
 
-        button2 = QPushButton(f'讀取升班調查 Excel 檔')
-        button2.setMinimumHeight(300)
-        button2.setMinimumHeight(60)
-        button2.setFont(self.uiCommons.font14)
-        button2.clicked.connect(partial(self.run_senior_report_from_excel))
+        buttons_and_functions = [
+            [(f'Google 下載 {self.config.semester} 學員資料', self.google_to_mysql)],
+            [('讀取 Google 上的升班調查', self.run_senior_report_from_google)],
+            [('讀取升班調查 Excel 檔', self.run_senior_report_from_excel)],
+            [label],
+            [('自動分班演算法說明', self.show_dispatch_doc)],
+        ]
 
-        close_button = QPushButton("關閉")
-        close_button.setFont(self.uiCommons.font10)
-        close_button.setMinimumHeight(300)
-        close_button.setMinimumHeight(60)
+        layout = style101_dialog_layout(self, self.uiCommons, buttons_and_functions,
+                                        button_width=360, button_height=60)
+        self.setLayout(layout)
 
-        layout.addWidget(button_sync)
-        layout.addWidget(button1)
-        layout.addWidget(button2)
-        layout.addWidget(label)
-        layout.addWidget(close_button)
+    def show_dispatch_doc(self):
+        # self.dispatchDocDialog.show()
+        self.dispatchDocDialog.exec()
 
-        close_button.clicked.connect(self.close)
-
-    # def run_senior_report_from_scratch(self, from_excel: bool):
-    #     try:
-    #         self.config.make_sure_output_folder_exists()
-    #         self.config.explorer_output_folder()
-    #         generate_senior_reports(self.config, True, from_excel=from_excel)
-    #     except Exception as e:
-    #         self.uiCommons.show_error_dialog(e)
-    #         logger.error(e)
-    #     finally:
-    #         self.close()
     #
     def google_to_mysql(self):
         self.uiCommons.google_to_mysql(check_formula=True)
+
     #     try:
     #         write_google_to_mysql(self.config)
     #     except Exception as e:

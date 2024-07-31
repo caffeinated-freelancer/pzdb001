@@ -28,5 +28,5 @@ def export_member_details(cfg: PzProjectConfig) -> str:
     formatted_date_time = now.strftime("%Y-%m-%d_%H-%M-%S")
 
     file_name = f'學員基本資料_{formatted_date_time}.xlsx'
-    service.save(f'{cfg.output_folder}/{file_name}.xlsx')
+    service.save(f'{cfg.output_folder}/{file_name}')
     return file_name

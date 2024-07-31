@@ -1,13 +1,13 @@
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QPushButton, QTextEdit
 
-from version import __version__
+from version import __pz_version__
 
 
 class DispatchDocDialog(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f'分班演算法說明 {__version__}')
+        self.setWindowTitle(f'分班演算法說明 {__pz_version__}')
 
         self.resize(720, 600)
 

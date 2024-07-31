@@ -15,14 +15,16 @@ from pz.utils import explorer_folder
 from pz_functions.exporters.member_details_exporter import export_member_details
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
+from pz_functions.generaters.member_comparison import generate_member_comparison_table
 from pz_functions.generaters.senior import generate_senior_reports
-from pz_functions.importers.member_details_update import member_details_update
-from pz_functions.importers.mysql_functions import write_access_to_mysql
-from ui.dispatch_doc_dialog import DispatchDocDialog
+from ui.access_db_dialog import AccessDatabaseDialog
 from ui.member_import_dialog import MemberImportDialog
+from ui.processing_done_dialog import ProcessingDoneDialog
 from ui.senior_contact_dialog import SeniorContactDialog
+from ui.toolbox_dialog import ToolboxDialog
 from ui.ui_commons import PzUiCommons
-from version import __version__
+from ui.vlookup_dialog import VLookUpDialog
+from version import __pz_version__
 
 WINDOW_SIZE = 235
 DISPLAY_HEIGHT = 35
@@ -31,30 +33,36 @@ BUTTON_SIZE = 120
 
 class PyPzWindows(QMainWindow):
     config: PzProjectConfig
-    dispatchDocDialog: DispatchDocDialog
+    # dispatchDocDialog: DispatchDocDialog
     seniorContactDialog: SeniorContactDialog
     memberImportDialog: MemberImportDialog
+    vLookUpDialog: VLookUpDialog
     default_font: QFont
     uiCommons: PzUiCommons
+    accessDatabaseDialog: AccessDatabaseDialog
+    toolboxDialog: ToolboxDialog
 
     def __init__(self, cfg: PzProjectConfig):
         super().__init__()
         self.config = cfg
         self.uiCommons = PzUiCommons(self, self.config)
-        self.setWindowTitle(f'普中資料管理程式 v{__version__}')
+        self.setWindowTitle(f'普中資料管理程式 v{__pz_version__}')
         self.default_font = QFont('Microsoft YaHei', 14)
-        self.setFixedSize(620, 520)
+        self.setFixedSize(880, 520)
         self.generalLayout = QVBoxLayout()
 
         centralWidget = QWidget(self)
         centralWidget.setLayout(self.generalLayout)
         self.setCentralWidget(centralWidget)
         self._createButtons()
-        self.dispatchDocDialog = DispatchDocDialog()
+        # self.dispatchDocDialog = DispatchDocDialog()
         self.seniorContactDialog = SeniorContactDialog(cfg)
         self.show()
         self.activateWindow()
         self.memberImportDialog = MemberImportDialog(cfg)
+        self.vLookUpDialog = VLookUpDialog(cfg)
+        self.accessDatabaseDialog = AccessDatabaseDialog(cfg)
+        self.toolboxDialog = ToolboxDialog(cfg)
 
         # layout = QHBoxLayout()
         # #
@@ -135,9 +143,9 @@ class PyPzWindows(QMainWindow):
             self.uiCommons.show_error_dialog(e)
             logger.error(e)
 
-    def show_dispatch_doc(self):
-        # self.dispatchDocDialog.show()
-        self.dispatchDocDialog.exec()
+    # def show_dispatch_doc(self):
+    #     # self.dispatchDocDialog.show()
+    #     self.dispatchDocDialog.exec()
 
     def open_graduation_folder(self):
         explorer_folder(self.config.excel.graduation.records.spreadsheet_folder)
@@ -155,12 +163,15 @@ class PyPzWindows(QMainWindow):
         self.config.make_sure_output_folder_exists()
         explorer_folder(self.config.output_folder)
 
-    def access_to_mysql(self):
-        try:
-            write_access_to_mysql(self.config)
-        except Exception as e:
-            self.uiCommons.show_error_dialog(e)
-            logger.error(e)
+    # def access_to_mysql(self):
+    #     try:
+    #         write_access_to_mysql(self.config)
+    #     except Exception as e:
+    #         self.uiCommons.show_error_dialog(e)
+    #         logger.error(e)
+
+    def handle_ms_access(self):
+        self.accessDatabaseDialog.exec()
 
     def google_to_mysql(self):
         self.uiCommons.google_to_mysql()
@@ -197,20 +208,69 @@ class PyPzWindows(QMainWindow):
         #     logger.error(e)
         # self.uiCommons.show_message_dialog('匯入/更新學員基本資料', f'完成匯入/更新學員基本資料')
 
+    def vlookup_by_name(self):
+        # try:
+        #     file_name, _ = QFileDialog.getOpenFileName(self, "開啟檔案", "", "Excel 檔案 (*.xlsx);; 所有檔案 (*)")
+        #     if file_name:
+        #         saved_file = generate_lookup(self.config, file_name)
+        #         os.startfile(saved_file)
+        # except Exception as e:
+        #     self.uiCommons.show_error_dialog(e)
+        #     logger.error(e)
+        self.vLookUpDialog.exec()
+
+    def member_difference_comparing(self):
+        try:
+            filename, headers, warnings = generate_member_comparison_table(self.config)
+
+            if filename is None:
+                self.uiCommons.done()
+                self.uiCommons.show_message_dialog('檢查學員資料差異', '太好了, Google 雲端跟個資的學員資料是一致的')
+            else:
+                if len(warnings) > 0:
+                    logger.trace(warnings)
+                    button = self.uiCommons.create_a_button(f'開啟差異檔 (Excel 格式)')
+                    button.clicked.connect(lambda: os.startfile(filename))
+                    dialog = ProcessingDoneDialog(
+                        self.config, 'Google 雲端 vs 個資學員資料',
+                        headers, warnings, [[button]])
+                    dialog.exec()
+                else:
+                    os.startfile(filename)
+        except Exception as e:
+            self.uiCommons.show_error_dialog(e)
+            logger.error(e)
+
+    def open_toolbox(self):
+        self.toolboxDialog.exec()
+
     def _createButtons(self):
         self.buttonMap = {}
         buttonsLayout = QGridLayout()
         keyBoard = [
             [('[產出] 禪修班結業統計', self.run_generate_graduation_reports),
-             ('上課記錄 資料夾', self.open_graduation_folder)],
-            [('[產出] 介紹人電聯表', self.run_introducer_report), ('意願調查 資料夾', self.open_questionnaire_folder)],
-            [('[產出] 學長電聯表(產生 A 表)', self.run_senior_report_from_scratch),
-             ('學長電聯 資料夾', self.open_senior_folder)],
-            [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
-            [('Access -> MySQL', self.access_to_mysql),
-             (f'Google 下載 {self.config.semester} 學員資料', self.google_to_mysql)],
-            [('學員基本資料 匯入', self.member_info_import), ('學員基本資料 匯出', self.member_info_export)],
-            [('開啟程式設定檔', self.open_settings_in_notepad), ('輸出樣版 資料夾', self.open_template_folder)],
+             ('上課記錄 資料夾', self.open_graduation_folder),
+             ('檢查學員資料差異', self.member_difference_comparing),
+             ],
+            [('[產出] 介紹人電聯表', self.run_introducer_report),
+             ('意願調查 資料夾', self.open_questionnaire_folder),
+             ('姓名 V 班級/組別 *', self.vlookup_by_name),
+             ],
+            [('[產出] 學長電聯表(產生 A 表) *', self.run_senior_report_from_scratch),
+             ('學長電聯 資料夾', self.open_senior_folder),
+             ],
+            # [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
+            [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report),
+             (f'Google 下載 {self.config.semester} 學員資料', self.google_to_mysql),
+             ],
+            [('學員基本資料 匯入 *', self.member_info_import),
+             ('學員基本資料 匯出', self.member_info_export),
+             ('MS Access 資料庫 *', self.handle_ms_access),
+             ],
+            [('開啟程式設定檔', self.open_settings_in_notepad),
+             ('輸出樣版 資料夾', self.open_template_folder),
+             ('設計師的工具小品 *', self.open_toolbox),
+             ]
             # [('開課前電聯表', self.do_nothing), ],
             # [('關懷表', self.do_nothing), ],
         ]
@@ -220,7 +280,7 @@ class PyPzWindows(QMainWindow):
                 key = k[0]
                 func = k[1]
                 self.buttonMap[key] = QPushButton(key)
-                self.buttonMap[key].setFixedSize(300, 55)
+                self.buttonMap[key].setFixedSize(280, 55)
                 self.buttonMap[key].setFont(self.uiCommons.font14)
                 if func is not None:
                     # print(key)
@@ -244,7 +304,7 @@ class PyPzWindows(QMainWindow):
         output_button_layout.addWidget(output_folder_button)
         self.generalLayout.addLayout(output_button_layout)
 
-        members = ['法世', '法和', '法華', '傳洵', '傳資']
+        members = ['法世', '法和', '法華', '法喜', '傳洵', '傳資']
 
         announce = QLabel(
             f'版權說明：本程式於 2024 年由普中精舍見聲法師帶領資料組{"、".join(members)} (按法名筆畫次序) 共同規劃需求；程式開發：劍青。')

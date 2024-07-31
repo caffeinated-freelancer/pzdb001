@@ -56,15 +56,14 @@ class PzDatabase:
         return affected_rows
 
     def prepared_update(self, query: str, callback) -> int:
-        if self.debug:
-            logger.debug(f"Update Query (prepared statement): {query}")
+        logger.debug(f"Update Query (prepared statement): {query}")
 
         cursor = self.connection.cursor()
         counter = 0
 
         for supplier in callback:
             params = supplier()
-            # print(params)
+            logger.trace(params)
             try:
                 cursor.execute(query, params)
                 counter += 1
@@ -76,10 +75,9 @@ class PzDatabase:
 
         affected_rows = cursor.rowcount
 
-        if self.debug:
-            logger.debug(f'{counter} record(s) updated successfully!')
+        logger.debug(f'{counter} record(s) updated successfully!')
         cursor.close()
-        return affected_rows
+        return counter
 
     def get_column_names(self, query: str) -> list[str]:
         cursor = self.connection.cursor()

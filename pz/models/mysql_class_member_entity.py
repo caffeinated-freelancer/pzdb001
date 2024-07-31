@@ -33,6 +33,17 @@ class MysqlClassMemberEntity(JSONClass):
         'deacon': 'deacon',
     }
 
+    ACCESS_DB_MAP: dict[str, tuple[str, str]] = {
+        'student_id': ('StudentId', 'INTEGER'),
+        'class_name': ('ClassName', 'TEXT(10)'),
+        'class_group': ('ClassGroup', 'INTEGER'),
+        'real_name': ('RealName', 'TEXT(10)'),
+        'dharma_name': ('DharmaName', 'TEXT(10)'),
+        'gender': ('Gender', 'TEXT(1)'),
+        'senior': ('Senior', 'TEXT(10)'),
+        'deacon': ('Deacon', 'TEXT(20)'),
+    }
+
     @staticmethod
     def from_(data: Any) -> 'MysqlClassMemberEntity':
         pass

@@ -2,7 +2,7 @@ import os.path
 import re
 from collections import OrderedDict
 from copy import copy
-from typing import Any
+from typing import Any, Callable
 
 import openpyxl
 from loguru import logger
@@ -125,6 +125,14 @@ class ExcelWorkbookService:
             for header in self.headers:
                 # print(header, self.headers[header])
                 print(f'\'\': \'{header}\',')
+
+    def read_row_by_row(self, callback: Callable[[int, list[Cell]], Any]):
+        for rowNum in range(self.header_row + 1, self.sheet.max_row + 1):
+            cells: list[Cell] = []
+            for colNum in range(1, self.sheet.max_column + 1):
+                cell = self.sheet.cell(row=rowNum, column=colNum)
+                cells.append(cell)
+            callback(rowNum, cells)
 
     def add_page_break(self, row: int):
         self.sheet.row_breaks.append(Break(id=row))
