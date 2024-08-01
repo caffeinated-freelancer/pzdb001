@@ -1,3 +1,5 @@
+from typing import Callable
+
 from .tools import crc16, crc32
 
 
@@ -6,9 +8,15 @@ class Modem(object):
     Base modem class.
     '''
 
-    def __init__(self, getc, putc):
-        self.getc = getc
-        self.putc = putc
+    getc: Callable[[int, int], bytes]
+    putc: Callable[[bytes], int | None]
+
+    # def __init__(self, getc, putc):
+    #     self.getc = getc
+    #     self.putc = putc
+    def __init__(self, get_c_function: Callable[[int, int], bytes], put_c_function: Callable[[bytes], int | None]):
+        self.getc = get_c_function
+        self.putc = put_c_function
 
     def calc_checksum(self, data, checksum=0):
         '''

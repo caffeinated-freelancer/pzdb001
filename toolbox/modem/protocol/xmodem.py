@@ -1,4 +1,8 @@
 import time
+from typing import Callable
+
+from loguru import logger
+
 from toolbox.modem import error
 from toolbox.modem.base import Modem
 from toolbox.modem import const
@@ -23,12 +27,28 @@ class XModem(Modem):
     # Protocol identifier
     protocol = const.PROTOCOL_XMODEM
 
+    sending_progress: float
+    sending_done: bool
+    receiving_done: bool
+    receiving_size: int
+
+    def __init__(self, get_c_function: Callable[[int, int], bytes], put_c_function: Callable[[bytes], int | None]):
+        super().__init__(get_c_function, put_c_function)
+
+        self.sending_progress = 0.0
+        self.sending_done = False
+        self.receiving_done = False
+        self.receiving_size = 0
+
     def abort(self, count=2, timeout=60):
         '''
         Send an abort sequence using CAN bytes.
         '''
         for counter in range(0, count):
             self.putc(const.CAN, timeout)
+
+    def error(self, message):
+        logger.error(message)
 
     def send(self, stream, retry=16, timeout=60, quiet=0):
         '''
@@ -41,6 +61,8 @@ class XModem(Modem):
         Returns ``True`` upon succesful transmission or ``False`` in case of
         failure.
         '''
+
+        self.sending_done = False
 
         # initialize protocol
         error_count = 0
@@ -217,12 +239,12 @@ class XModem(Modem):
 
             # Calculate CRC or checksum
             crc = crc_mode and self.calc_crc16(data) or \
-                self.calc_checksum(data)
+                  self.calc_checksum(data)
 
             # SENDS PACKET WITH CRC
             if not self._send_packet(
-                  sequence, data, packet_size, crc_mode,
-                  crc, error_count, retry, timeout):
+                    sequence, data, packet_size, crc_mode,
+                    crc, error_count, retry, timeout):
                 log.error(error.ERROR_SEND_PACKET)
                 return False
 
@@ -230,13 +252,16 @@ class XModem(Modem):
             sequence = (sequence + 1) % 0x100
             if filesize > 0:
                 total_sent += packet_size
-                progress = total_sent/filesize
-                remain = (filesize - total_sent)/filesize
+                progress = total_sent / filesize
+
+                self.sending_progress = progress * 100
+
+                remain = (filesize - total_sent) / filesize
                 print(error.DEBUG_SEND_PROGRESS.format(
-                        int(50 * progress) * '=',
-                        progress * 100,
-                        int(50 * remain) * ' ',
-                    ), end='\r'
+                    int(50 * progress) * '=',
+                    self.sending_progress,
+                    int(50 * remain) * ' ',
+                ), end='\r'
                 )
 
         # STREAM FINISHED, SEND EOT
@@ -362,6 +387,9 @@ class XModem(Modem):
         cancel = 0
         sequence = 1
         income_size = 0
+
+        self.receiving_size = 0
+
         self.putc(const.CRC)
 
         byte = self.getc(1, timeout)
@@ -399,6 +427,7 @@ class XModem(Modem):
                     if data:
                         # Append data to the stream
                         income_size += len(data)
+                        self.receiving_size += len(data)
                         stream.write(data)
                         self.putc(const.ACK)
                         sequence = (sequence + 1) % 0x100

@@ -18,7 +18,9 @@ from pz_functions.generaters.introducer import generate_introducer_reports
 from pz_functions.generaters.member_comparison import generate_member_comparison_table
 from pz_functions.generaters.senior import generate_senior_reports
 from ui.access_db_dialog import AccessDatabaseDialog
+from ui.checkin_system_dialog import CheckinSystemDialog
 from ui.member_import_dialog import MemberImportDialog
+from ui.pilgrimage_dialog import PilgrimageDialog
 from ui.processing_done_dialog import ProcessingDoneDialog
 from ui.senior_contact_dialog import SeniorContactDialog
 from ui.toolbox_dialog import ToolboxDialog
@@ -41,6 +43,8 @@ class PyPzWindows(QMainWindow):
     uiCommons: PzUiCommons
     accessDatabaseDialog: AccessDatabaseDialog
     toolboxDialog: ToolboxDialog
+    checkinSystemDialog: CheckinSystemDialog
+    pilgrimageDialog: PilgrimageDialog
 
     def __init__(self, cfg: PzProjectConfig):
         super().__init__()
@@ -63,6 +67,8 @@ class PyPzWindows(QMainWindow):
         self.vLookUpDialog = VLookUpDialog(cfg)
         self.accessDatabaseDialog = AccessDatabaseDialog(cfg)
         self.toolboxDialog = ToolboxDialog(cfg)
+        self.checkinSystemDialog = CheckinSystemDialog(cfg)
+        self.pilgrimageDialog = PilgrimageDialog(cfg)
 
         # layout = QHBoxLayout()
         # #
@@ -244,28 +250,36 @@ class PyPzWindows(QMainWindow):
     def open_toolbox(self):
         self.toolboxDialog.exec()
 
+    def open_checkin_system(self):
+        self.checkinSystemDialog.exec()
+
+    def open_pilgrimage_dialog(self):
+        self.pilgrimageDialog.exec()
+
     def _createButtons(self):
         self.buttonMap = {}
         buttonsLayout = QGridLayout()
         keyBoard = [
             [('[產出] 禪修班結業統計', self.run_generate_graduation_reports),
              ('上課記錄 資料夾', self.open_graduation_folder),
-             ('檢查學員資料差異', self.member_difference_comparing),
+             ('回山排車相關作業 *', self.open_pilgrimage_dialog),
              ],
             [('[產出] 介紹人電聯表', self.run_introducer_report),
              ('意願調查 資料夾', self.open_questionnaire_folder),
-             ('姓名 V 班級/組別 *', self.vlookup_by_name),
+             ('檢查學員資料差異', self.member_difference_comparing),
              ],
             [('[產出] 學長電聯表(產生 A 表) *', self.run_senior_report_from_scratch),
              ('學長電聯 資料夾', self.open_senior_folder),
+             ('姓名 V 班級/組別 *', self.vlookup_by_name),
              ],
             # [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
             [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report),
              (f'Google 下載 {self.config.semester} 學員資料', self.google_to_mysql),
+             ('MS Access 資料庫 *', self.handle_ms_access),
              ],
             [('學員基本資料 匯入 *', self.member_info_import),
              ('學員基本資料 匯出', self.member_info_export),
-             ('MS Access 資料庫 *', self.handle_ms_access),
+             ('報到系統輔助 *', self.open_checkin_system),
              ],
             [('開啟程式設定檔', self.open_settings_in_notepad),
              ('輸出樣版 資料夾', self.open_template_folder),

@@ -16,7 +16,7 @@ def _receive_char(sz: int, timeout: int = 1, debug: bool = False) -> bytes:
     return Rs232Global.ser.read(sz)
 
 
-def _send_char(char: bytes, timeout: int = 1, debug: bool = False):
+def _send_char(char: bytes, timeout: int = 1, debug: bool = False) -> int | None:
     if debug:
         print(f'sending {len(char)} bytes')
     return Rs232Global.ser.write(char)
@@ -25,7 +25,7 @@ def _send_char(char: bytes, timeout: int = 1, debug: bool = False):
 class Rs232Service:
     modem: YModem
 
-    def __init__(self, com_port: str, baud_rate: int = 115200, timeout: int = 30):
+    def __init__(self, com_port: str, baud_rate: int = 115200, timeout: int = 60):
         Rs232Global.ser = serial.Serial(com_port, baudrate=baud_rate, parity=serial.PARITY_NONE,
                                         stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS,
                                         timeout=timeout, write_timeout=timeout)

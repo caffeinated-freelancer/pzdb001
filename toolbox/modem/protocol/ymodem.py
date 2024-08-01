@@ -1,6 +1,7 @@
 import glob
 import os
 import time
+from typing import Callable
 
 from toolbox.modem import const
 from toolbox.modem import error
@@ -15,6 +16,9 @@ class YModem(XModem):
     '''
 
     protocol = const.PROTOCOL_YMODEM
+
+    def __init__(self, get_c_function: Callable[[int, int], bytes], put_c_function: Callable[[bytes], int | None]):
+        super().__init__(get_c_function, put_c_function)
 
     def send(self, pattern, retry=3, timeout=60):
         '''
@@ -117,6 +121,9 @@ class YModem(XModem):
             # Already aborted
             return False
 
+        self.sending_progress = 100.0
+        self.sending_done = True
+
         # All went fine
         return True
 
@@ -140,6 +147,9 @@ class YModem(XModem):
         cancel = 0
         sequence = 0
         num_files = 0
+
+        self.receiving_done = False
+
         while True:
             # First try CRC mode, if this fails, fall back to checksum mode
             if error_count >= retry:
@@ -221,14 +231,14 @@ class YModem(XModem):
                             break
 
                     # Request retransmission if something went wrong
-                    self.getc(packet_size + 1 + crc_mode)
+                    self.getc(packet_size + 1 + crc_mode, timeout)
                     self.putc(const.NAK)
                     self.getc(1, timeout)
                     continue
                 else:
                     error_count += 1
 
-                self.getc(packet_size + 1 + crc_mode)
+                self.getc(packet_size + 1 + crc_mode, timeout)
                 self.putc(const.NAK)
                 self.getc(1, timeout)
 
@@ -240,6 +250,7 @@ class YModem(XModem):
                 return False
 
             log.debug('File transfer done, requesting next')
+            self.receiving_done = True
             fileout.close()
             num_files += 1
             sequence = 0

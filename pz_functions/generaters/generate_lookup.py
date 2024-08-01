@@ -73,12 +73,16 @@ class VLookUpGenerator:
             logger.trace(f'lookup by student id: {student_id}')
 
             entity_tuple = self.member_service.find_one_grand_member_by_student_id(student_id)
+            if entity_tuple is None or entity_tuple[1] is None:
+                return 
 
         elif full_name:
             real_name, split_dharma_name = full_name_to_names(full_name)
             dharma_name = split_dharma_name if dharma_name is None else dharma_name
             entity_tuple, warnings = self.member_service.find_one_class_member_by_names_with_warning(
                 real_name, dharma_name)
+            if entity_tuple is None or entity_tuple[1] is None:
+                return
             logger.trace(f'lookup by name: {real_name} {dharma_name}')
             accumulate.extend([[f'第 {r} 列', w] for w in warnings])
 
@@ -92,10 +96,12 @@ class VLookUpGenerator:
                     if value is None or isinstance(value, str) and len(value) == 0:
                         if k in VLookUpModel.TO_MYSQL_CLASS_MEMBER_MAP:
                             attr = VLookUpModel.TO_MYSQL_CLASS_MEMBER_MAP[k]
-                            cells[i].value = entity.__dict__[attr]
+                            if attr in entity.__dict__:
+                                cells[i].value = entity.__dict__[attr]
                         elif detail is not None and k in VLookUpModel.TO_MYSQL_MEMBER_DETAILS_MAP:
                             attr = VLookUpModel.TO_MYSQL_MEMBER_DETAILS_MAP[k]
-                            cells[i].value = detail.__dict__[attr]
+                            if attr in detail.__dict__:
+                                cells[i].value = detail.__dict__[attr]
 
     def lookup(self) -> list[list[str]]:
         warnings: list[list[str]] = []
