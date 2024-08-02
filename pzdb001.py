@@ -67,6 +67,8 @@ if __name__ == '__main__':
         r'\\NS-Puzhong2\資料組\禪修程式檔\config.yaml'
     ]
 
+    # get_usb_info()
+
     for cfg_file in default_config_files:
         if Path(cfg_file).exists():
             default_config_file = cfg_file

@@ -23,6 +23,7 @@ from ui.member_import_dialog import MemberImportDialog
 from ui.pilgrimage_dialog import PilgrimageDialog
 from ui.processing_done_dialog import ProcessingDoneDialog
 from ui.senior_contact_dialog import SeniorContactDialog
+from ui.senior_report_common import SeniorReportCommon
 from ui.toolbox_dialog import ToolboxDialog
 from ui.ui_commons import PzUiCommons
 from ui.vlookup_dialog import VLookUpDialog
@@ -45,6 +46,7 @@ class PyPzWindows(QMainWindow):
     toolboxDialog: ToolboxDialog
     checkinSystemDialog: CheckinSystemDialog
     pilgrimageDialog: PilgrimageDialog
+    seniorReportCommon: SeniorReportCommon
 
     def __init__(self, cfg: PzProjectConfig):
         super().__init__()
@@ -69,6 +71,7 @@ class PyPzWindows(QMainWindow):
         self.toolboxDialog = ToolboxDialog(cfg)
         self.checkinSystemDialog = CheckinSystemDialog(cfg)
         self.pilgrimageDialog = PilgrimageDialog(cfg)
+        self.seniorReportCommon = SeniorReportCommon(self, self.uiCommons, self.config)
 
         # layout = QHBoxLayout()
         # #
@@ -130,24 +133,19 @@ class PyPzWindows(QMainWindow):
     #     #     print("User clicked Cancel!")
 
     def run_senior_report_from_scratch(self):
-        # try:
-        #     self.config.make_sure_output_folder_exists()
-        #     self.config.explorer_output_folder()
-        #     generate_senior_reports(self.config, True)
-        # except Exception as e:
-        #     self.show_error_dialog(e)
-        #     logger.error(e)
+
         self.seniorContactDialog.exec()
 
     def run_senior_report(self):
-        try:
-            self.config.make_sure_output_folder_exists()
-            self.config.explorer_output_folder()
-            generate_senior_reports(self.config, False)
-            self.uiCommons.done()
-        except Exception as e:
-            self.uiCommons.show_error_dialog(e)
-            logger.error(e)
+        self.seniorReportCommon.run_senior_report_from_scratch(False, from_excel=False, close_widget=False)
+        # try:
+        #     self.config.make_sure_output_folder_exists()
+        #     self.config.explorer_output_folder()
+        #     generate_senior_reports(self.config, False, from_excel=False)
+        #     self.uiCommons.done()
+        # except Exception as e:
+        #     self.uiCommons.show_error_dialog(e)
+        #     logger.error(e)
 
     # def show_dispatch_doc(self):
     #     # self.dispatchDocDialog.show()
@@ -260,30 +258,30 @@ class PyPzWindows(QMainWindow):
         self.buttonMap = {}
         buttonsLayout = QGridLayout()
         keyBoard = [
-            [('[產出] 禪修班結業統計', self.run_generate_graduation_reports),
-             ('上課記錄 資料夾', self.open_graduation_folder),
-             ('回山排車相關作業 *', self.open_pilgrimage_dialog),
+            [('📝 禪修班結業統計', self.run_generate_graduation_reports),
+             ('📁 上課記錄', self.open_graduation_folder),
+             ('🐞 檢查學員資料差異', self.member_difference_comparing),
              ],
-            [('[產出] 介紹人電聯表', self.run_introducer_report),
-             ('意願調查 資料夾', self.open_questionnaire_folder),
-             ('檢查學員資料差異', self.member_difference_comparing),
+            [('📝 介紹人電聯表', self.run_introducer_report),
+             ('📁 意願調查', self.open_questionnaire_folder),
+             ('🔎 姓名 V 班級/組別🔸', self.vlookup_by_name),
              ],
-            [('[產出] 學長電聯表(產生 A 表) *', self.run_senior_report_from_scratch),
-             ('學長電聯 資料夾', self.open_senior_folder),
-             ('姓名 V 班級/組別 *', self.vlookup_by_name),
+            [('📝 學長電聯表(產生 A 表)🔸', self.run_senior_report_from_scratch),
+             ('📁 學長電聯', self.open_senior_folder),
+             ('🚎 回山排車相關作業🔸', self.open_pilgrimage_dialog),
              ],
             # [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
-            [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report),
-             (f'Google 下載 {self.config.semester} 學員資料', self.google_to_mysql),
-             ('MS Access 資料庫 *', self.handle_ms_access),
+            [('📝 學長電聯表(讀 B 表)', self.run_senior_report),
+             (f'🔄 Google {self.config.semester} 學員資料', self.google_to_mysql),
+             ('💾 MS Access 資料庫🔸', self.handle_ms_access),
              ],
-            [('學員基本資料 匯入 *', self.member_info_import),
-             ('學員基本資料 匯出', self.member_info_export),
-             ('報到系統輔助 *', self.open_checkin_system),
+            [('🔄 學員基本資料 匯入🔸', self.member_info_import),
+             ('🔄 學員基本資料 匯出', self.member_info_export),
+             ('🌀 報到系統輔助🔸', self.open_checkin_system),
              ],
-            [('開啟程式設定檔', self.open_settings_in_notepad),
-             ('輸出樣版 資料夾', self.open_template_folder),
-             ('設計師的工具小品 *', self.open_toolbox),
+            [('📖 開啟程式設定檔', self.open_settings_in_notepad),
+             ('📁 輸出樣版', self.open_template_folder),
+             ('🔧設計師的工具小品🔸', self.open_toolbox),
              ]
             # [('開課前電聯表', self.do_nothing), ],
             # [('關懷表', self.do_nothing), ],
@@ -311,7 +309,7 @@ class PyPzWindows(QMainWindow):
         # self.generalLayout.addWidget(output_folder_button)
 
         output_button_layout = QGridLayout()
-        output_folder_button = QPushButton('程式輸出資料夾')
+        output_folder_button = QPushButton('📁 程式輸出')
         output_folder_button.setFixedSize(500, 60)
         output_folder_button.setFont(self.uiCommons.font14)
         output_folder_button.clicked.connect(self.open_output_folder)

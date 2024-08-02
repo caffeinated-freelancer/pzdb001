@@ -69,7 +69,7 @@ def style101_dialog_layout(dialog: QDialog, ui_commons: PzUiCommons,
         text_edit.setHtml(html)
         layout.addWidget(text_edit)
 
-    button = QPushButton("關閉")
+    button = QPushButton("❎ 關閉")
     button.setFixedHeight(button_height)
     button.setFont(ui_commons.font12)
     button.clicked.connect(dialog.close)

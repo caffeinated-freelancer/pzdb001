@@ -13,6 +13,7 @@ from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
 from pz.models.senior_contact_advanced import SeniorContactAdvanced
 from pz.models.senior_contact_fundamental import SeniorContactFundamental
+from pz.models.senior_report_error_model import SeniorReportError
 from pz.pz_commons import ACCEPTABLE_CLASS_NAMES, phone_number_normalize
 from services.excel_template_service import ExcelTemplateService
 from services.excel_workbook_service import ExcelWorkbookService
@@ -39,6 +40,7 @@ class SeniorReportGenerator:
     signup_next_service: SignupNextInfoService
     prev_senior_service: PreviousSeniorService
     questionnaire_service: QuestionnaireService
+    initial_errors: list[SeniorReportError]
 
     # prev_class_senior_map: dict[str, NewClassSeniorModel]  # 舊的班級學長到哪了
 
@@ -53,6 +55,8 @@ class SeniorReportGenerator:
                                                          self.new_senior_service)
         self.questionnaire_service = QuestionnaireService(config, self.member_service, self.prev_senior_service,
                                                           self.new_senior_service, self.signup_next_service)
+
+        self.initial_errors = self.new_senior_service.get_initial_errors()
 
         self.fp = None
 
@@ -77,18 +81,27 @@ class SeniorReportGenerator:
         if self.fp is not None:
             self.fp.close()
 
+    def get_initial_errors(self) -> list[SeniorReportError]:
+        return self.initial_errors
+
     @staticmethod
     def class_gender_as_key(class_name: str, gender: str) -> str:
         return f'{class_name}-{gender}'
 
-    def _auto_assignment(self, spreadsheet_file: str, from_excel: bool = False):
-        # 預先處理, 記載每個學員的升班意願
-        self.signup_next_service.pre_processing(from_excel=from_excel)
+    def _auto_assignment(self, spreadsheet_file: str, from_excel: bool = False, no_fix_senior: bool = False) -> list[
+        SeniorReportError]:
+        errors: list[SeniorReportError] = []
 
-        self.signup_next_service.fix_senior_willingness()
+        # 預先處理, 記載每個學員的升班意願
+        err = self.signup_next_service.pre_processing(from_excel=from_excel)
+        errors.extend(err)
+
+        if not no_fix_senior:
+            self.signup_next_service.fix_senior_willingness()
 
         # 預先處理禪修班意願調查表, 包括讀取及連結介紹人的部份
-        self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=True)
+        err = self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=True)
+        errors.extend(err)
 
         self.new_senior_service.perform_follower_loop_first()
 
@@ -105,6 +118,8 @@ class SeniorReportGenerator:
 
         # 對所有的班級分配組別
         self.new_senior_service.perform_auto_assignment()
+
+        return errors
 
     # def pre_processing_questionnaire(self, spreadsheet_file: str):
     #     pass
@@ -244,9 +259,15 @@ class SeniorReportGenerator:
         self._read_predefined_information()
         self.new_senior_service.perform_table_b_auto_assignment()
 
-    def processing_senior_report(self, spreadsheet_file: str, from_excel: bool = False, from_scratch: bool = True):
+    def processing_senior_report(self, spreadsheet_file: str,
+                                 from_excel: bool = False, from_scratch: bool = True, no_fix_senior: bool = False) -> \
+            list[SeniorReportError]:
+
+        errors: list[SeniorReportError] = []
+
         if from_scratch:
-            self._auto_assignment(spreadsheet_file, from_excel=from_excel)
+            err = self._auto_assignment(spreadsheet_file, from_excel=from_excel, no_fix_senior=no_fix_senior)
+            errors.extend(err)
         else:
             self._perform_final_report_processing(spreadsheet_file)
 
@@ -255,6 +276,8 @@ class SeniorReportGenerator:
                 self._generate_fundamental_report(class_name, spreadsheet_file)
             else:
                 self._generate_advanced_report(class_name, spreadsheet_file)
+
+        return errors
 
     def _read_predefined_information(self):
         if self.from_scratch:
@@ -408,12 +431,15 @@ class SeniorReportGenerator:
             template.write_data(supplier)
 
 
-def generate_senior_reports(cfg: PzProjectConfig, from_scratch: bool, from_excel: bool | None = None):
+def generate_senior_reports(cfg: PzProjectConfig,
+                            from_scratch: bool, from_excel: bool | None = None,
+                            no_fix_senior: bool = False) -> list[SeniorReportError]:
     if not from_scratch:
         if not os.path.exists(cfg.excel.new_class_predefined_info.spreadsheet_file):
             from_scratch = True
 
     generator = SeniorReportGenerator(cfg, from_scratch)
+    errors = generator.get_initial_errors()
 
     from_excel = False if from_excel is None else from_excel
 
@@ -421,9 +447,14 @@ def generate_senior_reports(cfg: PzProjectConfig, from_scratch: bool, from_excel
         files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
 
         for filename in files:
-            generator.processing_senior_report(filename, from_excel=from_excel, from_scratch=from_scratch)
+            err = generator.processing_senior_report(filename, from_excel=from_excel,
+                                                     from_scratch=from_scratch, no_fix_senior=no_fix_senior)
             generator.generate_new_class_lineup(filename)
+            errors.extend(err)
+            return errors
     else:
-        generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_excel=from_excel,
-                                           from_scratch=from_scratch)
+        err = generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_excel=from_excel,
+                                                 from_scratch=from_scratch, no_fix_senior=no_fix_senior)
         generator.generate_new_class_lineup(cfg.excel.questionnaire.spreadsheet_file)
+        errors.extend(err)
+        return errors

@@ -501,7 +501,7 @@ class ClassAndGender:
     def add_table_b_assignment(self, group_id: int | None, entry: NewClassLineup):
         if group_id is not None:
             if group_id not in self.groups:
-                raise RuntimeError(f'{entry.realName} 分配的群組 {group_id} 沒有學長')
+                raise RuntimeError(f'{entry.realName} 分配到 {self.name} 第 {group_id} 組, 該組沒有學長')
             senior = self.groups[group_id]
 
             logger.trace(

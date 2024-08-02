@@ -27,9 +27,13 @@ def receive_file_worker(rs232: Rs232Service, folder: str):
 def sending_file_worker(rs232: Rs232Service, filename: str):
     global workerState
     workerState = WorkerState.SENDING
-    rs232.send_file(filename)
-    workerState = WorkerState.IDLE
-    logger.info('### 檔案傳送完成 ###')
+    try:
+        rs232.send_file(filename)
+    except Exception as e:
+        logger.exception(e)
+    finally:
+        workerState = WorkerState.IDLE
+        logger.info(f'### {filename} 檔案傳送完成 ###')
 
 
 class FileTransferService:
@@ -37,10 +41,26 @@ class FileTransferService:
 
     config: PzProjectConfig
     workerThread: threading.Thread | None
+    rs232: Rs232Service | None
 
     def __init__(self, cfg: PzProjectConfig):
         self.config = cfg
         self.workerThread = None
+        self.rs232 = None
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self.workerThread is not None:
+            self.workerThread.join()
+            self.workerThread = None
+            logger.debug('worker thread terminated')
+
+        if self.rs232 is not None:
+            self.rs232.close()
+            self.rs232 = None
+            logger.debug('rs232 closed')
 
     def check_worker_thread_available(self) -> bool:
         if self.workerThread is not None:
@@ -63,8 +83,9 @@ class FileTransferService:
         if com_port is None:
             logger.info(f'no communication port')
         else:
-            rs232 = Rs232Service(com_port, baud_rate=self.baud_rate, timeout=60)
-            self.workerThread = threading.Thread(target=receive_file_worker, args=(rs232, self.config.output_folder))
+            self.rs232 = Rs232Service(com_port, baud_rate=self.baud_rate, timeout=60)
+            self.workerThread = threading.Thread(target=receive_file_worker,
+                                                 args=(self.rs232, self.config.output_folder))
             self.workerThread.start()
 
     def send_file(self, filename: str):
@@ -76,8 +97,8 @@ class FileTransferService:
         if com_port is None:
             logger.info(f'no communication port')
         else:
-            rs232 = Rs232Service(com_port, baud_rate=self.baud_rate, timeout=60)
-            self.workerThread = threading.Thread(target=sending_file_worker, args=(rs232, filename))
+            self.rs232 = Rs232Service(com_port, baud_rate=self.baud_rate, timeout=60)
+            self.workerThread = threading.Thread(target=sending_file_worker, args=(self.rs232, filename))
             self.workerThread.start()
 
     @staticmethod
@@ -100,3 +121,9 @@ class FileTransferService:
             if com_port is None and port.description.startswith('USB Serial Port'):
                 com_port = port.device
         return com_port
+
+    def get_progress(self) -> int:
+        if self.rs232 is None:
+            return 0
+        else:
+            return self.rs232.get_progress()

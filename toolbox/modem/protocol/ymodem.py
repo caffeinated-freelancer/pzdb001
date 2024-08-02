@@ -3,6 +3,8 @@ import os
 import time
 from typing import Callable
 
+from loguru import logger
+
 from toolbox.modem import const
 from toolbox.modem import error
 from toolbox.modem.protocol.xmodem import XModem
@@ -45,6 +47,7 @@ class YModem(XModem):
             crc_mode = 1 if (start_byte == const.CRC) else 0
         else:
             log.error(error.ABORT_PROTOCOL)
+            logger.error(error.ABORT_PROTOCOL)
             # Already aborted
             return False
 
@@ -56,6 +59,7 @@ class YModem(XModem):
             data = ''.join([os.path.basename(filename), '\x00'])
 
             log.debug(error.DEBUG_START_FILENAME % (filename,))
+            logger.debug(error.DEBUG_START_FILENAME % (filename,))
             # Pick a suitable packet length for the filename
             packet_size = 128 if (len(data) < 128) else 1024
 
@@ -73,6 +77,7 @@ class YModem(XModem):
                 self.abort(timeout=timeout)
                 return False
             log.debug(error.DEBUG_FILENAME_SENT.format(filename))
+            logger.debug(error.DEBUG_FILENAME_SENT.format(filename))
 
             # Wait for <CRC> before transmitting the file contents
             error_count = 0
@@ -90,8 +95,10 @@ class YModem(XModem):
             if not self._send_stream(
                     filedesc, crc_mode, retry, timeout, filesize):
                 log.error(error.ABORT_SEND_STREAM)
+                logger.error(error.ABORT_SEND_STREAM)
                 return False
             log.debug(error.DEBUG_FILE_SENT.format(filename))
+            logger.debug(error.DEBUG_FILE_SENT.format(filename))
 
             # AT THIS POINT
             # - FILE CONTENTS TRANSMITTED
@@ -103,6 +110,7 @@ class YModem(XModem):
             error_count = 0
             if not self._wait_recv(error_count, timeout):
                 log.error(error.ABORT_INIT_NEXT)
+                logger.error(error.ABORT_INIT_NEXT)
                 # Already aborted
                 return False
 
@@ -118,6 +126,7 @@ class YModem(XModem):
                 sequence, data, packet_size, crc_mode, crc,
                 error_count, retry, timeout):
             log.error(error.ABORT_SEND_PACKET)
+            logger.error(error.ABORT_SEND_PACKET)
             # Already aborted
             return False
 
@@ -173,9 +182,11 @@ class YModem(XModem):
             elif byte == const.CAN:
                 if cancel:
                     log.error(error.ABORT_RECV_CAN_CAN)
+                    logger.error(error.ABORT_RECV_CAN_CAN)
                     return None
                 else:
                     log.debug(error.DEBUG_RECV_CAN)
+                    logger.debug(error.DEBUG_RECV_CAN)
                     cancel = 1
                     continue
             elif byte in [const.SOH, const.STX]:
@@ -194,9 +205,11 @@ class YModem(XModem):
                 elif byte == const.CAN:
                     if cancel:
                         log.error(error.ABORT_RECV_CAN_CAN)
+                        logger.error(error.ABORT_RECV_CAN_CAN)
                         return None
                     else:
                         log.debug(error.DEBUG_RECV_CAN)
+                        logger.debug(error.DEBUG_RECV_CAN)
                         cancel = 1
                         continue
                 elif byte in [const.SOH, const.STX]:
@@ -215,8 +228,8 @@ class YModem(XModem):
                                 self.putc(const.ACK)
                                 return num_files
 
-                            log.info('Receiving %s to %s' %
-                                     (filename, basedir))
+                            log.info('Receiving %s to %s' % (filename, basedir))
+                            logger.info('Receiving %s to %s' % (filename, basedir))
                             # print('Receiving %s to %s' % (filename, basedir))
                             fileout = open(os.path.join(
                                 basedir, os.path.basename(filename.decode('utf-8'))), 'wb')
@@ -247,9 +260,11 @@ class YModem(XModem):
 
             if not stream_size:
                 log.error(error.ABORT_RECV_STREAM)
+                logger.error(error.ABORT_RECV_STREAM)
                 return False
 
             log.debug('File transfer done, requesting next')
+            logger.debug('File transfer done, requesting next')
             self.receiving_done = True
             fileout.close()
             num_files += 1

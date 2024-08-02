@@ -1,3 +1,5 @@
+import math
+
 import serial
 import serial.tools.list_ports
 from loguru import logger
@@ -23,7 +25,7 @@ def _send_char(char: bytes, timeout: int = 1, debug: bool = False) -> int | None
 
 
 class Rs232Service:
-    modem: YModem
+    modem: YModem | None = None
 
     def __init__(self, com_port: str, baud_rate: int = 115200, timeout: int = 60):
         Rs232Global.ser = serial.Serial(com_port, baudrate=baud_rate, parity=serial.PARITY_NONE,
@@ -34,7 +36,14 @@ class Rs232Service:
         self.modem = YModem(_receive_char, _send_char)
 
     def __del__(self):
-        Rs232Global.ser.close()
+        self.close()
+
+    def close(self):
+        self.modem = None
+        if Rs232Global.ser is not None:
+            Rs232Global.ser.close()
+            Rs232Global.ser = None
+            logger.debug('closed serial connection')
 
     def send_file(self, filename: str):
         self.modem.send(filename)
@@ -44,8 +53,13 @@ class Rs232Service:
         if r is not None:
             logger.debug(f'received: {r}')
         else:
-            logger.error(f'received: DONE (NONE)')
+            logger.error(f'received: DONE')
 
     @staticmethod
     def list_com_ports() -> list[ListPortInfo]:
         return serial.tools.list_ports.comports()
+
+    def get_progress(self) -> int:
+        if self.modem is None:
+            return 0
+        return math.ceil(self.modem.sending_progress)

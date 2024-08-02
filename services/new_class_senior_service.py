@@ -8,6 +8,7 @@ from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
+from pz.models.senior_report_error_model import SeniorReportError
 from pz.models.signup_next_info import SignupNextInfoModel
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
@@ -20,6 +21,7 @@ class NewClassSeniorService:
     senior_by_student_id: dict[int, list[NewClassSeniorModel]]
     all_classes: dict[str, list[NewClassSeniorModel]]
     member_service: PzGrandMemberService
+    initial_errors: list[SeniorReportError]
 
     def __init__(self, cfg: PzProjectConfig, member_service: PzGrandMemberService):
         self.config = cfg
@@ -32,10 +34,12 @@ class NewClassSeniorService:
         self.member_service = member_service
 
         logger.info(f'新班學長: {len(new_class_seniors)} 筆資料')
-        self._init_new_classes_by_senior(new_class_seniors)
-        self._add_new_default_member(new_class_seniors)
+        self.initial_errors = self._init_new_classes_by_senior(new_class_seniors)
+        err = self._add_new_default_member(new_class_seniors)
+        self.initial_errors.extend(err)
 
-    def _init_new_classes_by_senior(self, new_class_seniors: list[NewClassSeniorModel]) -> None:
+    def _init_new_classes_by_senior(self, new_class_seniors: list[NewClassSeniorModel]) -> list[SeniorReportError]:
+        errors: list[SeniorReportError] = []
         group_id_assignment: dict[str, int] = {}
 
         for senior in new_class_seniors:
@@ -51,7 +55,9 @@ class NewClassSeniorService:
                                                                                             senior.dharmaName,
                                                                                             senior.gender)
             if senior_infos is None or senior_infos[0] is None:
-                logger.warning(f'Warning: 學長 {senior.fullName} 在後端資料庫中找不到')
+                message = f'糟糕: 學長 {senior.fullName} / {senior.deacon} 在後端資料庫中找不到'
+                logger.warning(message)
+                errors.append(SeniorReportError.warning(message))
                 continue
 
             senior.studentId = int(senior_infos[0].student_id)
@@ -65,12 +71,16 @@ class NewClassSeniorService:
                     senior.groupId = group_id_assignment[senior.className] + 1
                 else:
                     senior.groupId = 101
-                    logger.warning(f'班級 {senior.className} / {senior.gender} / {senior.fullName} 沒有組別')
+                    message = f'班級 {senior.className} / {senior.gender} / {senior.fullName} 沒有組別'
+                    logger.warning(message)
+                    errors.append(SeniorReportError.warning(message))
                 group_id_assignment[senior.className] = senior.groupId
             else:
                 key = self.key_of_senior_by_group_id(senior.className, senior.groupId)
                 if key in self.senior_by_class_group:
-                    logger.warning(f'班級 {senior.className}, 組別 {senior.groupId} 重覆')
+                    message = f'班級 {senior.className}, 組別 {senior.groupId} 重覆'
+                    logger.warning(message)
+                    errors.append(SeniorReportError.warning(message))
                 else:
                     self.senior_by_class_group[key] = senior
 
@@ -83,15 +93,19 @@ class NewClassSeniorService:
 
         for clazz in self.all_classes:
             self.all_classes[clazz].sort(key=lambda x: x.groupId)
+        return errors
 
-    def _add_new_default_member(self, new_class_seniors: list[NewClassSeniorModel]) -> None:
+    def _add_new_default_member(self, new_class_seniors: list[NewClassSeniorModel]) -> list[SeniorReportError]:
+        errors: list[SeniorReportError] = []
         logger.debug(f'Assignment Step {AutoAssignmentStepEnum.PREDEFINED_SENIOR}')
         for entry in new_class_seniors:
             member_tuple = self.member_service.find_grand_member_by_pz_name_and_dharma_name(
                 entry.fullName, entry.dharmaName, entry.gender)
 
             if member_tuple is None:
-                logger.warning(f'Warning: {entry.studentId} / {entry.fullName} not found')
+                message = f'學長 姓名：{entry.fullName}，法名：{entry.dharmaName if entry is not None else ''}，姓別：{entry.gender} 在資料庫中找不到'
+                logger.warning(message)
+                errors.append(SeniorReportError.warning(message))
                 continue
 
             signup_next = SignupNextInfoModel({})
@@ -121,6 +135,10 @@ class NewClassSeniorService:
                                    AutoAssignmentStepEnum.PREDEFINED_SENIOR, deacon=entry.deacon)
             else:
                 logger.warning(f'Warning: {entry.className} / {entry.groupId} not found')
+        return errors
+
+    def get_initial_errors(self):
+        return self.initial_errors
 
     @staticmethod
     def key_of_senior(class_name: str, gender: str):

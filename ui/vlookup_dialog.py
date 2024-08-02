@@ -22,8 +22,8 @@ class VLookUpDialog(QDialog):
         self.setWindowTitle(f'姓名 V 班級/組別 v{__pz_version__}')
 
         buttons_and_functions = [
-            [('開啟 Excel 檔 (一般電腦用)', self.vlookup_by_name)],
-            [('開啟 Excel 檔 (個資電腦用)', self.vlookup_by_name_using_access)],
+            [('開啟 Excel 檔 (💻 一般電腦用)', self.vlookup_by_name)],
+            [('開啟 Excel 檔 (🔒 個資電腦用)', self.vlookup_by_name_using_access)],
         ]
 
         self.resize(550, 620)

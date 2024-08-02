@@ -7,6 +7,7 @@ from pz.config import PzProjectConfig
 from pz.models.auto_assignment_step import AutoAssignmentStepEnum
 from pz.models.mix_member import MixMember
 from pz.models.new_class_senior import NewClassSeniorModel
+from pz.models.senior_report_error_model import SeniorReportError
 from pz.models.signup_next_info import SignupNextInfoModel
 from pz.pz_commons import ACCEPTABLE_CLASS_NAMES
 from services.excel_workbook_service import ExcelWorkbookService
@@ -94,7 +95,9 @@ class SignupNextInfoService:
             entries.append(entry)
         return entries
 
-    def pre_processing(self, from_excel: bool = False, for_table_b: bool = False):
+    def pre_processing(self, from_excel: bool = False, for_table_b: bool = False) -> list[SeniorReportError]:
+        errors: list[SeniorReportError] = []
+
         if from_excel:
             workbook = ExcelWorkbookService(SignupNextInfoModel({}),
                                             self.config.excel.signup_next_info.spreadsheet_file,
@@ -124,7 +127,9 @@ class SignupNextInfoService:
             member_tuple = self.member_service.find_grand_member_by_student_id(entry.studentId, prefer=entry.className)
 
             if member_tuple is None:
-                logger.error(f'糟糕: {entry.studentId} / {entry.fullName} 不存在資料庫')
+                error_message = f'糟糕: {entry.studentId} / {entry.fullName} 不存在資料庫'
+                logger.error(error_message)
+                errors.append(SeniorReportError.error(error_message))
                 continue
 
             mix_member = MixMember(member_tuple[0], member_tuple[1], None, entry)
@@ -144,6 +149,8 @@ class SignupNextInfoService:
             if debug_on_student_id(entry.studentId):
                 logger.error(
                     f'{signup_member_entry.get_full_name()} add to all_signup_entries {signup_member_entry.signups}')
+
+        return errors
 
     def processing_signups(self):
         current_senior = ''

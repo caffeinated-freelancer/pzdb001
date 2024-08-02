@@ -310,9 +310,11 @@ class XModem(Modem):
 
             # Protocol error
             log.error(error.ERROR_PROTOCOL)
+            logger.error(error.ERROR_PROTOCOL)
             error_count += 1
             if error_count >= retry:
                 log.error(error.ABORT_ERROR_LIMIT)
+                logger.error(error.ABORT_ERROR_LIMIT)
                 self.abort(timeout=timeout)
                 return False
 

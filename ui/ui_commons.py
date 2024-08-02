@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import QMessageBox, QWidget, QPushButton
 from loguru import logger
 
 from pz.config import PzProjectConfig
-from pz_functions.generaters.senior import generate_senior_reports
 from pz_functions.importers.mysql_functions import write_google_to_mysql
 
 
@@ -72,18 +71,6 @@ class PzUiCommons:
         self.widget.activateWindow()
         message_box.show()
 
-    def run_senior_report_from_scratch(self, from_excel: bool):
-        try:
-            self.config.make_sure_output_folder_exists()
-            self.config.explorer_output_folder()
-            generate_senior_reports(self.config, True, from_excel=from_excel)
-            self.done()
-        except Exception as e:
-            self.show_error_dialog(e)
-            logger.error(e)
-        finally:
-            self.widget.close()
-
     def google_to_mysql(self, check_formula: bool = False):
         try:
             records = write_google_to_mysql(self.config, check_formula=check_formula)
@@ -96,3 +83,6 @@ class PzUiCommons:
     @staticmethod
     def done():
         logger.info(f'##### 完成 #####')
+
+    def under_construction(self):
+        self.show_message_dialog('糟糕!', '糟糕! 程式還沒寫好')

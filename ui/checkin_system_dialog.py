@@ -14,13 +14,12 @@ class CheckinSystemDialog(QDialog):
         self.config = cfg
         self.uiCommons = PzUiCommons(self, self.config)
 
-
         self.setWindowTitle(f'報到系統資料處理')
 
         buttons_and_functions = [
             [
-                ('福慧出坡簽到資料匯出', self.dummy),
-                ('福慧出坡補簽到記錄', self.dummy),
+                ('福慧出坡簽到資料匯出', self.uiCommons.under_construction),
+                ('福慧出坡補簽到記錄', self.uiCommons.under_construction),
             ],
         ]
 
@@ -33,6 +32,3 @@ class CheckinSystemDialog(QDialog):
             </ol>
                     ''')
         self.setLayout(layout)
-
-    def dummy(self):
-        pass

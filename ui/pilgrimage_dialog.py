@@ -18,8 +18,8 @@ class PilgrimageDialog(QDialog):
 
         buttons_and_functions = [
             [
-                ('回山相關作業 1', self.dummy),
-                ('回山相關作業 2', self.dummy),
+                ('回山相關作業 1', self.uiCommons.under_construction),
+                ('回山相關作業 2', self.uiCommons.under_construction)
             ],
         ]
 
@@ -27,6 +27,3 @@ class PilgrimageDialog(QDialog):
 
         layout = style101_dialog_layout(self, self.uiCommons, buttons_and_functions)
         self.setLayout(layout)
-
-    def dummy(self):
-        pass

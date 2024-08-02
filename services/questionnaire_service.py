@@ -6,6 +6,7 @@ from pz.models.dispatching_status import DispatchingStatus
 from pz.models.mix_member import MixMember
 from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
 from pz.models.questionnaire_entry import QuestionnaireEntry
+from pz.models.senior_report_error_model import SeniorReportError
 from pz.pz_commons import phone_number_normalize
 from pz.utils import full_name_to_names
 from services.excel_workbook_service import ExcelWorkbookService
@@ -56,7 +57,8 @@ class QuestionnaireService:
         self.questionnaire_dict[key] = questionnaire
         return True
 
-    def pre_processing(self, spreadsheet_file: str, from_scratch: bool = True):
+    def pre_processing(self, spreadsheet_file: str, from_scratch: bool = True) -> list[SeniorReportError]:
+        errors: list[SeniorReportError] = []
         self.all_questionnaires_entries = []
 
         service = ExcelWorkbookService(PzQuestionnaireInfo({}), spreadsheet_file,
@@ -106,7 +108,7 @@ class QuestionnaireService:
         if not from_scratch:
             for questionnaire_entry in self.all_questionnaires_entries:
                 self.save_questionnaire(questionnaire_entry)
-            return
+            return errors
 
         for questionnaire_entry in self.all_questionnaires_entries:
             entry = questionnaire_entry.entry
@@ -141,6 +143,7 @@ class QuestionnaireService:
                     else:
                         logger.debug(
                             f'{entry.fullName}/{mix_member.get_unique_id()} 已經有學長 {mix_member.senior.fullName} at {entry.registerClass}')
+        return errors
 
     def assign_having_senior_questionnaire(self):
         for questionnaires_entry in self.all_questionnaires_entries:
