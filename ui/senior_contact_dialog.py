@@ -1,7 +1,6 @@
 import os
 
 from PyQt6.QtWidgets import QDialog, QLabel, QCheckBox
-from loguru import logger
 
 from pz.config import PzProjectConfig
 from ui.dispatch_doc_dialog import DispatchDocDialog
@@ -17,6 +16,7 @@ class SeniorContactDialog(QDialog):
     seniorReportCommon: SeniorReportCommon
     # fix_senior_checkbox_value: bool = False
     senior_checkbox: QCheckBox
+    with_b_checkbox: QCheckBox
 
     def __init__(self, cfg: PzProjectConfig):
         self.config = cfg
@@ -28,21 +28,24 @@ class SeniorContactDialog(QDialog):
 
         self.setWindowTitle(f'[產出] 學長電聯表(自動分班)')
 
-        self.resize(400, 250)
+        self.resize(420, 250)
 
         file_name = os.path.basename(cfg.excel.signup_next_info.spreadsheet_file)
         label = QLabel(f'Excel 檔: {file_name}')
         label.setFont(self.uiCommons.font10)
         self.senior_checkbox = QCheckBox("不要調整學長意願所屬班級 (可節省處理時間)")
-        self.senior_checkbox.setFont(self.uiCommons.font10)
-        self.senior_checkbox.setChecked(True)
+        self.senior_checkbox.setFont(self.uiCommons.font12)
+        self.senior_checkbox.setChecked(False)
+        self.with_b_checkbox = QCheckBox("產出 A 表時, 參考 B 表")
+        self.with_b_checkbox.setFont(self.uiCommons.font12)
+        self.with_b_checkbox.setChecked(False)
         # senior_checkbox.stateChanged.connect(self.senior_checkbox_state_changed)
         # self.fix_senior_checkbox_value = senior_checkbox.isChecked()
 
-
         buttons_and_functions = [
-            [(f'Google 下載 {self.config.semester} 學員資料', self.google_to_mysql)],
+            [(f'Google {self.config.semester} 學員同步', self.google_to_mysql)],
             [self.senior_checkbox],
+            [self.with_b_checkbox],
             [('讀取 Google 上的升班調查', self.run_senior_report_from_google)],
             [('讀取升班調查 Excel 檔', self.run_senior_report_from_excel)],
             [label],
@@ -75,13 +78,16 @@ class SeniorContactDialog(QDialog):
     #         logger.error(e)
 
     def run_senior_report_from_google(self):
-        logger.info(f'{self.senior_checkbox.isChecked()}')
         self.seniorReportCommon.run_senior_report_from_scratch(
-            True, from_excel=False, close_widget=True, no_fix_senior=self.senior_checkbox.isChecked())
+            True, from_excel=False, close_widget=True,
+            no_fix_senior=self.senior_checkbox.isChecked(),
+            with_table_b=self.with_b_checkbox.isChecked())
 
     def run_senior_report_from_excel(self):
         self.seniorReportCommon.run_senior_report_from_scratch(
-            True, from_excel=True, close_widget=True, no_fix_senior=self.senior_checkbox.isChecked())
+            True, from_excel=True, close_widget=True,
+            no_fix_senior=self.senior_checkbox.isChecked(),
+            with_table_b=self.with_b_checkbox.isChecked())
 
     # def show_error_dialog(self, e: Exception):
     #     message_box = QMessageBox(self)  # Set parent for proper positioning

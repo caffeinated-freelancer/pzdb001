@@ -67,6 +67,10 @@ class PzQuestionnaireInfo(ExcelModelInterface):
     bookkeepingDate: str
     remark: str
 
+    classmate: str | None
+    followee: 'QuestionnaireEntry'
+    followers: list['MixMember']
+
     def __init__(self, values: dict[str, str]):
         for k, v in PzQuestionnaireInfo.VARIABLE_MAP.items():
             if v in values:
@@ -75,8 +79,21 @@ class PzQuestionnaireInfo(ExcelModelInterface):
             else:
                 self.__dict__[k] = None
 
+        self.classmate = None
+        self.followee = None
+        self.followers = None
+
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4, ensure_ascii=False)
 
     def new_instance(self, args):
         return PzQuestionnaireInfo(args)
+
+    def add_non_member_followee(self, followee: 'QuestionnaireEntry'):
+        self.followee = followee
+
+    def add_non_member_follower(self, follower: 'MixMember'):
+        if self.followers is not None:
+            self.followers = self.followers.append(follower)
+        else:
+            self.followers = [follower]

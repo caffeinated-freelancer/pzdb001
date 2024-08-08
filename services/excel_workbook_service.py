@@ -138,10 +138,13 @@ class ExcelWorkbookService:
         self.sheet.row_breaks.append(Break(id=row))
 
     def read_all(self, required_attribute: str | None = None) -> list[ExcelModelInterface]:
+        counter = 0
+        blank_counter = 0
         if self.debug:
             logger.debug(self.headers)
         infos = []
         for rowNum in range(self.header_row + 1, self.sheet.max_row + 1, 1):
+            counter += 1
             item = {}
             for colNum in range(1, self.max_column, 1):
                 if colNum in self.headers_rev:
@@ -158,8 +161,14 @@ class ExcelWorkbookService:
 
             if required_attribute is not None:
                 if hasattr(info, required_attribute) and info.__dict__.get(required_attribute) is not None:
+                    blank_counter = 0
                     # print(info.to_json())
                     infos.append(info)
+                else:
+                    blank_counter += 1
+
+                    if blank_counter > 10:
+                        break
             else:
                 infos.append(info)
 
@@ -168,6 +177,7 @@ class ExcelWorkbookService:
         #     sheet.cell(rowNum, 2).font = Font(color='FF0000')
         # 將結果另存新檔
         # wb.save('produceSales_update.xlsx')
+        logger.debug(f'records: {counter}, effected records: {len(infos)}, sheet_max_row: {self.max_row()}')
         return infos
 
     def write_cell(self, row_num, col_num, value, color: str | None = None, font=None):

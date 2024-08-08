@@ -9,12 +9,15 @@ from pz.config import PzProjectConfig
 from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
+from pz.models.new_class_group_statistics import NewClassGroupStatistics
 from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
+from pz.models.questionnaire_entry import QuestionnaireEntry
 from pz.models.senior_contact_advanced import SeniorContactAdvanced
 from pz.models.senior_contact_fundamental import SeniorContactFundamental
 from pz.models.senior_report_error_model import SeniorReportError
 from pz.pz_commons import ACCEPTABLE_CLASS_NAMES, phone_number_normalize
+from services.excel_creation_service import ExcelCreationService
 from services.excel_template_service import ExcelTemplateService
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
@@ -56,6 +59,10 @@ class SeniorReportGenerator:
         self.questionnaire_service = QuestionnaireService(config, self.member_service, self.prev_senior_service,
                                                           self.new_senior_service, self.signup_next_service)
 
+        # FIXME
+        # member_relation_service = MemberRelationService(config)
+        # member_relation_service.load_relations(gender_care=True)
+
         self.initial_errors = self.new_senior_service.get_initial_errors()
 
         self.fp = None
@@ -88,21 +95,38 @@ class SeniorReportGenerator:
     def class_gender_as_key(class_name: str, gender: str) -> str:
         return f'{class_name}-{gender}'
 
-    def _auto_assignment(self, spreadsheet_file: str, from_excel: bool = False, no_fix_senior: bool = False) -> list[
-        SeniorReportError]:
+    def _auto_assignment(self,
+                         spreadsheet_file: str, from_excel: bool = False,
+                         no_fix_senior: bool = False,
+                         with_table_b: bool = False) -> list[SeniorReportError]:
         errors: list[SeniorReportError] = []
 
         # 預先處理, 記載每個學員的升班意願
+        # 這裡不會把學員排進班級, 只是記載學員們的升班意願供後續查詢使用。
         err = self.signup_next_service.pre_processing(from_excel=from_excel)
         errors.extend(err)
 
         if not no_fix_senior:
+            # 調整學長填寫升班意願的位置
             self.signup_next_service.fix_senior_willingness()
 
         # 預先處理禪修班意願調查表, 包括讀取及連結介紹人的部份
-        err = self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=True)
+        err, questionnaires_entries = self.questionnaire_service.pre_processing(spreadsheet_file)
         errors.extend(err)
 
+        if with_table_b:
+            # 要參考 B 表的話得先把 B 表讀進來, 排好編班
+            self._read_predefined_information(with_table_b=True, questionnaires_entries=questionnaires_entries)
+
+        # 這部份會有部份滿足編組條件的學員先做分組處理
+        # err = self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=True, with_table_b=with_table_b)
+        err = self.questionnaire_service.pre_processing_non_member_classmate()
+        errors.extend(err)
+
+        err = self.questionnaire_service.pre_processing_assignment(with_table_b=with_table_b)
+        errors.extend(err)
+
+        # 部部份要檢查介紹人關係鏈或誰與誰同組的問題
         self.new_senior_service.perform_follower_loop_first()
 
         # 處理所有升班調查的部份
@@ -255,18 +279,19 @@ class SeniorReportGenerator:
 
     def _perform_final_report_processing(self, spreadsheet_file: str):
         self.signup_next_service.pre_processing(from_excel=False, for_table_b=True)
-        self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=False)
+        self.questionnaire_service.pre_processing(spreadsheet_file)
         self._read_predefined_information()
         self.new_senior_service.perform_table_b_auto_assignment()
 
     def processing_senior_report(self, spreadsheet_file: str,
-                                 from_excel: bool = False, from_scratch: bool = True, no_fix_senior: bool = False) -> \
-            list[SeniorReportError]:
+                                 from_excel: bool = False, from_scratch: bool = True, no_fix_senior: bool = False,
+                                 with_table_b: bool = False) -> list[SeniorReportError]:
 
         errors: list[SeniorReportError] = []
 
         if from_scratch:
-            err = self._auto_assignment(spreadsheet_file, from_excel=from_excel, no_fix_senior=no_fix_senior)
+            err = self._auto_assignment(spreadsheet_file, from_excel=from_excel, no_fix_senior=no_fix_senior,
+                                        with_table_b=with_table_b)
             errors.extend(err)
         else:
             self._perform_final_report_processing(spreadsheet_file)
@@ -279,11 +304,18 @@ class SeniorReportGenerator:
 
         return errors
 
-    def _read_predefined_information(self):
-        if self.from_scratch:
+    def _read_predefined_information(self, with_table_b: bool = False,
+                                     questionnaires_entries: list[QuestionnaireEntry] | None = None):
+        if self.from_scratch and not with_table_b:
             return
 
         spreadsheet = self.config.excel.new_class_predefined_info
+
+        if not os.path.exists(spreadsheet.spreadsheet_file):
+            logger.error(f'B 表檔案不存在: {spreadsheet.spreadsheet_file} ')
+            return
+        else:
+            logger.error(f'讀取 B 表: {spreadsheet.spreadsheet_file} ')
 
         service = ExcelWorkbookService(NewClassLineup({}), spreadsheet.spreadsheet_file,
                                        sheet_name=spreadsheet.sheet_name,
@@ -320,30 +352,40 @@ class SeniorReportGenerator:
                     mix_member = MixMember(member_tuple[0], member_tuple[1], None, None)
                 else:
                     mix_member = signup_entry.member
+
             else:
-                member_tuple = self.member_service.find_grand_member_by_pz_name_and_dharma_name(
-                    entry.realName, entry.dharmaName, entry.gender)
+                if (entry.phoneNumber is not None and
+                        entry.gender in ('男', '女') and questionnaires_entries is not None):
+                    for questionnaire in questionnaires_entries:
+                        if (entry.realName == questionnaire.entry.fullName and
+                                entry.gender == questionnaire.entry.gender and
+                                entry.phoneNumber == questionnaire.entry.mobilePhone):
+                            mix_member = questionnaire.member
 
-                if member_tuple is None:
-                    if entry.gender not in ('男', '女'):
-                        logger.error(
-                            f'姓名: {entry.realName}, 法名: {entry.dharmaName}, 沒有學號或非學員時, 性別資料是必要')
-                        continue
-                    if entry.phoneNumber is None or entry.phoneNumber == '':
-                        logger.warning(
-                            f'姓名: {entry.realName}, 法名: {entry.dharmaName}, 性別: {entry.gender} 在資料中找不到, 但同時缺少行動電話資料')
-                else:
-                    if member_tuple[1] is not None:
-                        signup_entry = self.signup_next_service.find_by_student_id_for_table_b(
-                            member_tuple[1].student_id)
-                    elif member_tuple[0] is not None:
-                        signup_entry = self.signup_next_service.find_by_student_id_for_table_b(
-                            int(member_tuple[0].student_id))
+                if mix_member is None:
+                    member_tuple = self.member_service.find_grand_member_by_pz_name_and_dharma_name(
+                        entry.realName, entry.dharmaName, entry.gender)
 
-                    if signup_entry is not None:
-                        mix_member = signup_entry.member
+                    if member_tuple is None:
+                        if entry.gender not in ('男', '女'):
+                            logger.error(
+                                f'姓名: {entry.realName}, 法名: {entry.dharmaName}, 沒有學號或非學員時, 性別資料是必要')
+                            continue
+                        if entry.phoneNumber is None or entry.phoneNumber == '':
+                            logger.warning(
+                                f'姓名: {entry.realName}, 法名: {entry.dharmaName}, 性別: {entry.gender} 在資料中找不到, 但同時缺少行動電話資料')
                     else:
-                        mix_member = MixMember(member_tuple[0], member_tuple[1], None, None)
+                        if member_tuple[1] is not None:
+                            signup_entry = self.signup_next_service.find_by_student_id_for_table_b(
+                                member_tuple[1].student_id)
+                        elif member_tuple[0] is not None:
+                            signup_entry = self.signup_next_service.find_by_student_id_for_table_b(
+                                int(member_tuple[0].student_id))
+
+                        if signup_entry is not None:
+                            mix_member = signup_entry.member
+                        else:
+                            mix_member = MixMember(member_tuple[0], member_tuple[1], None, None)
 
             if mix_member is None or entry.studentId is None or entry.phoneNumber is not None or entry.lastSenior is None:  # 意願調查
                 questionnaire = self.questionnaire_service.get_questionnaire(entry.realName, entry.phoneNumber,
@@ -372,13 +414,36 @@ class SeniorReportGenerator:
 
             entry.mixMember = mix_member
 
-            self.new_senior_service.add_table_b_member(entry.className, entry.gender, entry.groupId, entry)
+            self.new_senior_service.add_table_b_member(entry.className, entry.gender, entry.groupId, entry,
+                                                       with_table_b=with_table_b)
 
         logger.info(f'{counter} 位來自意願調查')
 
         # newbies = sorted(newbies, key=lambda x: x.realName)
         # for newbie in newbies:
         #     print(f'{newbie.realName} {newbie.className} {newbie.phoneNumber} {newbie.studentId} {newbie.lastSenior}')
+
+    def generate_class_groups_statistics(self, filename: str):
+        entries: list[NewClassGroupStatistics] = []
+        for class_name in self.new_senior_service.all_classes:
+            seniors = self.new_senior_service.all_classes[class_name]
+            for senior in seniors:
+                entries.append(NewClassGroupStatistics(senior))
+
+        service = ExcelCreationService(entries[0])
+
+        data: list[list[Any]] = []
+        for model in entries:
+            data.append(model.get_values_in_pecking_order())
+
+        os.path.basename(filename)
+
+        full_file_path = f'{self.config.output_folder}/[班級分組人數概況表]-{os.path.basename(filename)}'
+
+        supplier = (lambda y=x: x for x in data)
+        service.write_data(supplier)
+
+        service.save(full_file_path)
 
     def generate_new_class_lineup(self, filename: str):
         template_key = 'new_class_lineup'
@@ -433,7 +498,8 @@ class SeniorReportGenerator:
 
 def generate_senior_reports(cfg: PzProjectConfig,
                             from_scratch: bool, from_excel: bool | None = None,
-                            no_fix_senior: bool = False) -> list[SeniorReportError]:
+                            no_fix_senior: bool = False,
+                            with_table_b: bool = False) -> list[SeniorReportError]:
     if not from_scratch:
         if not os.path.exists(cfg.excel.new_class_predefined_info.spreadsheet_file):
             from_scratch = True
@@ -448,13 +514,17 @@ def generate_senior_reports(cfg: PzProjectConfig,
 
         for filename in files:
             err = generator.processing_senior_report(filename, from_excel=from_excel,
-                                                     from_scratch=from_scratch, no_fix_senior=no_fix_senior)
+                                                     from_scratch=from_scratch, no_fix_senior=no_fix_senior,
+                                                     with_table_b=with_table_b)
             generator.generate_new_class_lineup(filename)
+            generator.generate_class_groups_statistics(filename)
             errors.extend(err)
             return errors
     else:
         err = generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_excel=from_excel,
-                                                 from_scratch=from_scratch, no_fix_senior=no_fix_senior)
+                                                 from_scratch=from_scratch, no_fix_senior=no_fix_senior,
+                                                 with_table_b=with_table_b)
         generator.generate_new_class_lineup(cfg.excel.questionnaire.spreadsheet_file)
+        generator.generate_class_groups_statistics(cfg.excel.questionnaire.spreadsheet_file)
         errors.extend(err)
         return errors

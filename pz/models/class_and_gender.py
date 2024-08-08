@@ -49,7 +49,7 @@ class ClassAndGender:
     followers: dict[int, list[MixMember]]
     looping_groups: list[list[MixMember]]
     willingness: dict[int, MixMember]
-    introducers: dict[int, MysqlClassMemberEntity]
+    introducers: dict[int, MysqlClassMemberEntity | MixMember]
     on_assignment_triggers: dict[int, TriggerWaitingEntry]
     table_b_pending: list[NewClassLineup]
 
@@ -80,6 +80,14 @@ class ClassAndGender:
             logger.warning(
                 f'{self.name} / {group_id} / {self.gender} 班級/學長資料重覆: {org_senior.fullName} vs {senior.fullName}')
 
+    def already_assigned(self, mix_member: MixMember) -> int:
+        unique_id = mix_member.get_unique_id()
+
+        if unique_id in self.already_assigned_students:
+            return self.already_assigned_students[unique_id]
+        return -1
+        # if unique_id in self.student_ids:
+
     def add_member_to(self, senior: NewClassSeniorModel, mix_member: MixMember, reason: str,
                       assignment: AutoAssignmentStepEnum, deacon: str = None, internal: bool = False,
                       non_follower_only: bool = False, lineup: NewClassLineup | None = None,
@@ -92,17 +100,17 @@ class ClassAndGender:
                 return False
         mix_member.senior = senior
 
-        if mix_member.get_student_id() is not None:
-            if mix_member.get_student_id() in self.student_ids:
-                if not internal:
-                    logger.trace(
-                        f'({reason}) 資料重覆: {mix_member.get_full_name()} {mix_member.get_student_id()} 已經存在 {senior.className} / {senior.gender}')
-                    return False
-            else:
-                self.student_ids.add(mix_member.get_student_id())
+        # if mix_member.get_student_id() is not None:
+        if mix_member.get_unique_id() in self.student_ids:
+            if not internal:
+                logger.trace(
+                    f'({reason}) 資料重覆: {mix_member.get_full_name()} {mix_member.get_student_id()} 已經存在 {senior.className} / {senior.gender}')
+                return False
+        else:
+            self.student_ids.add(mix_member.get_unique_id())
 
         senior.members.append(AssignedMember(mix_member, deacon, reason, assignment, lineup, info_b))
-        self.already_assigned_students[mix_member.get_student_id()] = senior.groupId
+        self.already_assigned_students[mix_member.get_unique_id()] = senior.groupId
 
         if mix_member.get_unique_id() in self.on_assignment_triggers:
             triggered_data = self.on_assignment_triggers[mix_member.get_unique_id()]
@@ -151,7 +159,17 @@ class ClassAndGender:
                 f'自動配置 {member.get_full_name()}/{member.get_senior()} 到 {assigned_group.fullName} {self.name}/{self.gender}/{assigned_group_id}')
             reason = f'自動配置 群:{self.pending_group_id}, 人數:{len(pending_group)}, 前學長:{member.get_senior()}'
             if member.classMember is None and member.questionnaireInfo is not None:
-                reason = f'自動配置 禪修班意願調查, 介紹人: {member.questionnaireInfo.introducerName}'
+                if member.questionnaireInfo.classmate is not None:
+                    if member.questionnaireInfo.classmate == member.questionnaireInfo.introducerName:
+                        reason = f'自動配置 禪修班意願調查, 與 {member.questionnaireInfo.classmate} 同組'
+                    elif member.questionnaireInfo.introducerName is not None and member.questionnaireInfo.introducerName != '':
+                        reason = f'## 學員要求與 {member.questionnaireInfo.classmate} 同組, 自動配置 禪修班意願調查, 介紹人: {member.questionnaireInfo.introducerName}'
+                    else:
+                        reason = f'## 學員要求與 {member.questionnaireInfo.classmate} 同組, 自動配置 禪修班意願調查, 沒有介紹人'
+                elif member.questionnaireInfo.introducerName is not None and member.questionnaireInfo.introducerName != '':
+                    reason = f'自動配置 禪修班意願調查, 介紹人: {member.questionnaireInfo.introducerName}'
+                else:
+                    reason = f'自動配置 禪修班意願調查, 沒有介紹人'
 
             if description is not None and description != '':
                 reason = description
@@ -281,22 +299,44 @@ class ClassAndGender:
         logger.trace(f'solved, iteration {counter}')
         return True
 
-    def follow(self, introducer: MysqlClassMemberEntity, mix_member: MixMember):
-        student_id = introducer.student_id
+    # def follow_introducer(self, introducer: MysqlClassMemberEntity, mix_member: MixMember):
+    #     student_id = introducer.student_id
+    #
+    #     if student_id in self.followers:
+    #         self.followers[student_id].append(mix_member)
+    #         if student_id not in self.introducers:
+    #             raise RuntimeError(f'介紹人 {introducer.real_name} 不存在')
+    #     else:
+    #         self.followers[student_id] = [mix_member]
+    #         self.introducers[student_id] = introducer
+    #
+    #     self.all_followers_student_ids.add(mix_member.get_unique_id())
+    #
+    #     logger.debug(
+    #         f'{self.name}/{self.gender}, followee: {introducer.real_name}/{introducer.student_id}, {len(self.followers)
+    #         } {[f'{x.get_full_name()}/{x.get_unique_id()}' for x in self.followers[student_id]]}')
 
-        if student_id in self.followers:
-            self.followers[student_id].append(mix_member)
-            if student_id not in self.introducers:
-                raise RuntimeError(f'介紹人 {introducer.real_name} 不存在')
+    def follow_introducer(self, followee: MixMember | MysqlClassMemberEntity, mix_member: MixMember):
+        if isinstance(followee, MixMember):
+            unique_id = followee.get_unique_id()
+        elif isinstance(followee, MysqlClassMemberEntity):
+            unique_id = followee.student_id
         else:
-            self.followers[student_id] = [mix_member]
-            self.introducers[student_id] = introducer
+            return False
+
+        if unique_id in self.followers:
+            self.followers[unique_id].append(mix_member)
+            if unique_id not in self.introducers:
+                raise RuntimeError(f'介紹人 {followee.get_full_name()} 不存在')
+        else:
+            self.followers[unique_id] = [mix_member]
+            self.introducers[unique_id] = followee
 
         self.all_followers_student_ids.add(mix_member.get_unique_id())
 
-        logger.debug(
-            f'{self.name}/{self.gender}, followee: {introducer.real_name}/{introducer.student_id}, {len(self.followers)
-            } {[f'{x.get_full_name()}/{x.get_unique_id()}' for x in self.followers[student_id]]}')
+        # logger.debug(
+        #     f'{self.name}/{self.gender}, followee: {introducer.real_name}/{introducer.student_id}, {len(self.followers)
+        #     } {[f'{x.get_full_name()}/{x.get_unique_id()}' for x in self.followers[student_id]]}')
 
     def add_willingness(self, mix_member: MixMember):
         debug = debug_on_student_id(mix_member.get_unique_id())
@@ -414,7 +454,8 @@ class ClassAndGender:
         loop_index = 0
         for looping_entries in self.looping_groups:
             loop_index += 1
-            logger.error(f'{self.name}/{self.gender} : looping group: {[x.get_full_name() for x in looping_entries]}')
+            logger.info(f'{self.name}/{self.gender} : looping group: {[x.get_full_name() for x in looping_entries]}')
+
             self.add_to_pending(looping_entries,
                                 description=f'禪修班意願調查: {len(looping_entries)}人互為介紹人/被介紹人 ({self.name}/{self.gender}/{loop_index})')
 
@@ -454,9 +495,15 @@ class ClassAndGender:
 
                 if count == 0:
                     found = False
-                else:
+                elif isinstance(introducer, MysqlClassMemberEntity):
                     description = f'介紹鏈, 介紹人: {introducer.real_name}/{root_followee} - {count} 個被介紹人 {[
                         x.get_full_name() for x in lopping_entries]}'
+                    self.on_assignment_triggers[root_followee] = TriggerWaitingEntry(lopping_entries, description)
+                    logger.info(
+                        f'{self.name}/{self.gender} {description}')
+                    break
+                elif isinstance(introducer, MixMember):
+                    description = f'介紹/同組鏈, {[x.get_full_name() for x in lopping_entries]} 要求與 {introducer.get_full_name()} 同組'
                     self.on_assignment_triggers[root_followee] = TriggerWaitingEntry(lopping_entries, description)
                     logger.info(
                         f'{self.name}/{self.gender} {description}')
@@ -484,12 +531,18 @@ class ClassAndGender:
                     raise RuntimeError(f'{group_id} not found')
                 senior = self.groups[group_id]
 
-                description = f'介紹鏈, 介紹人: {introducer.real_name} - {len(entry.members)} 個被介紹人 {[
-                    x.get_full_name() for x in entry.members]}'
+                if isinstance(introducer, MixMember):
+                    description = f'介紹/同組鏈, {[x.get_full_name() for x in entry.members]} 要求與 {introducer.get_full_name()} 同組'
+                else:
+                    description = f'介紹鏈: {introducer.real_name} - {len(entry.members)} 個被介紹人 {[
+                        x.get_full_name() for x in entry.members]}'
                 for m in entry.members:
                     self.add_member_to(senior, m, description, AutoAssignmentStepEnum.INTRODUCER_FOLLOWING)
                 removing_entries.append(student_id)
                 logger.info(f'{self.name}/{self.gender} {description}')
+            elif isinstance(introducer, MixMember):
+                logger.info(f'{self.name}/{self.gender} {introducer.get_full_name()}/{student_id} {[
+                    x.get_full_name() for x in entry.members]}')
             else:
                 logger.info(f'{self.name}/{self.gender} {introducer.real_name}/{student_id} {[
                     x.get_full_name() for x in entry.members]}')
@@ -498,8 +551,10 @@ class ClassAndGender:
             for student_id in removing_entries:
                 del self.on_assignment_triggers[student_id]
 
-    def add_table_b_assignment(self, group_id: int | None, entry: NewClassLineup):
+    def add_table_b_assignment(self, group_id: int | None, entry: NewClassLineup, with_table_b: bool = False):
         if group_id is not None:
+            logger.trace(f'B 表設定 {self.name}/{self.gender} 加入 {entry.realName}')
+
             if group_id not in self.groups:
                 raise RuntimeError(f'{entry.realName} 分配到 {self.name} 第 {group_id} 組, 該組沒有學長')
             senior = self.groups[group_id]
@@ -509,7 +564,7 @@ class ClassAndGender:
 
             self.add_member_to(senior, entry.mixMember, entry.automationInfo, AutoAssignmentStepEnum.TABLE_B_ASSIGNMENT,
                                lineup=entry, info_b=f'B 表指定: {self.name} 群組: {group_id} (學長: {senior.fullName})')
-        else:
+        elif not with_table_b:
             logger.debug(f'{self.name}/{self.gender} {entry.realName} 自動配組')
             self.table_b_pending.append(entry)
 

@@ -10,6 +10,7 @@ from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
+from pz.usb_disk import get_usb_info
 from pz_functions.exporters.member_details_exporter import export_member_details
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
@@ -67,7 +68,7 @@ if __name__ == '__main__':
         r'\\NS-Puzhong2\資料組\禪修程式檔\config.yaml'
     ]
 
-    # get_usb_info()
+    get_usb_info()
 
     for cfg_file in default_config_files:
         if Path(cfg_file).exists():

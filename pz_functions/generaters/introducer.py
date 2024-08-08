@@ -46,8 +46,22 @@ def data_by_class_and_group(a: dict[str, Any], b: dict[str, Any]) -> int:
     if group_id_a != group_id_b:
         return group_id_a - group_id_b
 
-    if a['介紹人'] != b['介紹人']:
-        return -1 if a['介紹人'] < b['介紹人'] else 1
+    introducer_tag = '介紹人'
+
+    if introducer_tag in a and introducer_tag in b:
+        try:
+            if a[introducer_tag] != b[introducer_tag]:
+                return -1 if a[introducer_tag] < b[introducer_tag] else 1
+        except:
+            pass
+        finally:
+            return 0
+    elif introducer_tag in a:
+        return -1
+    elif introducer_tag in b:
+        return 1
+    else:
+        return 0
 
     class_name_a = class_name_to_integer(a['報名班別'])
     class_name_b = class_name_to_integer(b['報名班別'])
@@ -55,8 +69,12 @@ def data_by_class_and_group(a: dict[str, Any], b: dict[str, Any]) -> int:
     if class_name_a != class_name_b:
         return class_name_a - class_name_b
 
-    if a['性別'] != b['性別']:
-        return -1 if a['性別'] < b['性別'] else 1
+    gender = '性別'
+
+    if gender in a and gender in b:
+        if a[gender] is not None and b[gender] is not None:
+            if a[gender] != b[gender]:
+                return -1 if a[gender] < b[gender] else 1
 
     if a['學員姓名'] != b['學員姓名']:
         return -1 if a['學員姓名'] < b['學員姓名'] else 1
@@ -96,6 +114,8 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
                                    cfg.excel.questionnaire.sheet_name, header_at=cfg.excel.questionnaire.header_row,
                                    debug=True)
     entries: list[PzQuestionnaireInfo] = service.read_all(required_attribute='fullName')
+
+    logger.info(f'{len(entries)} questionnaire entries found')
 
     # mapping = {'介紹人': 1, '班別': 2, '組別': 3, '學員姓名': 4, '性別': 5, '報名班別': 6, '茶會/上午': 7,
     #            '茶會/晚上': 8, '讀經班家長/關係': 9, '連絡電話': 10, '說明事項': 11, '2/22出席': 12, '2/29出席': 13,

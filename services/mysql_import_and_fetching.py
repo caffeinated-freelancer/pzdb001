@@ -4,12 +4,15 @@ import re
 from loguru import logger
 
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
+from pz.cloud.spreadsheet_relations_service import PzCloudSpreadsheetRelationsService
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
 from pz.models.google_class_member import GoogleClassMemberModel
+from pz.models.google_member_relation import GoogleMemberRelation
 from pz.models.member_detail_model import MemberDetailModel
 from pz.models.member_in_access import MemberInAccessDB
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
+from pz.models.mysql_member_relation_entity import MysqlMemberRelationEntity
 from pz.mysql.db import PzMysqlDatabase
 from pz.utils import full_name_to_real_name
 from services.member_merging_service import MemberMergingService
@@ -46,7 +49,8 @@ class MySqlImportAndFetchingService:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
                  ''')
 
-        self.db.perform_update('DROP TABLE IF EXISTS `member_details`')
+        self._drop_table('member_details')
+
         self.db.perform_update(query)
 
         cols, results = service.read_all()
@@ -81,20 +85,20 @@ class MySqlImportAndFetchingService:
         except Exception as ignored:
             pass
 
-    def _backup_table(self):
+    def _backup_table(self, current_table: str):
         number_of_backups = 3
 
-        from_table = f'{self.current_table}_{number_of_backups + 1}'
+        from_table = f'{current_table}_{number_of_backups + 1}'
         self._drop_table(from_table)
 
         for i in range(number_of_backups, 0, -1):
             try:
                 to_table = from_table
-                from_table = f'{self.current_table}_{i}'
+                from_table = f'{current_table}_{i}'
                 self._rename_table(from_table, to_table)
             except Exception as ignored:
                 pass
-        self._rename_table(self.current_table, from_table)
+        self._rename_table(current_table, from_table)
 
     def google_class_members_to_mysql(self, check_formula: bool = False) -> int:
         settings: PzProjectGoogleSpreadsheetConfig = self.config.google.spreadsheets.get('class_members')
@@ -122,7 +126,7 @@ CREATE TABLE `{self.current_table}`  (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
             ''')
 
-            self._backup_table()
+            self._backup_table(self.current_table)
             self.db.perform_update(query)
 
             columns_insert = ','.join([f'`{k}`' for k in MysqlClassMemberEntity.VARIABLE_MAP.keys()])
@@ -175,6 +179,9 @@ CREATE TABLE `{self.current_table}`  (
             logger.info(f'>>> {len(params)} 筆資料匯入')
             return len(params)
 
+    # def google_relationships_to_mysql(self):
+    #     settings: PzProjectGoogleSpreadsheetConfig = self.config.google.spreadsheets.get('relationships')
+
     def read_google_class_members(self) -> list[MysqlClassMemberEntity]:
         cols, results = self.db.query(f'SELECT * FROM `{self.current_table}` ORDER BY class_name,class_group,id')
         entities = []
@@ -188,6 +195,14 @@ CREATE TABLE `{self.current_table}`  (
         entities = []
         for result in results:
             entity = MysqlMemberDetailEntity(cols, result)
+            entities.append(entity)
+        return entities
+
+    def read_member_relations(self) -> list[MysqlMemberRelationEntity]:
+        cols, results = self.db.query('SELECT * FROM `member_relationships`')
+        entities = []
+        for result in results:
+            entity = MysqlMemberRelationEntity(cols, result)
             entities.append(entity)
         return entities
 
@@ -237,3 +252,79 @@ CREATE TABLE `{self.current_table}`  (
                     logger.warning(f'student_id:{entry.student_id}')
         return records, count
 
+    def google_relation_to_mysql(self) -> int:
+        settings: PzProjectGoogleSpreadsheetConfig = self.config.google.spreadsheets.get('relationships')
+
+        relation_table_name = 'member_relationships'
+
+        if settings is not None:
+            if settings.fields_map is not None:
+                GoogleMemberRelation.remap_variables(settings.fields_map)
+
+            service = PzCloudSpreadsheetRelationsService(settings, self.config.google.secret_file)
+
+            query = (f'''
+CREATE TABLE `{relation_table_name}`  (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `real_name` varchar(12) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '姓名',
+  `dharma_name` varchar(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '法名',
+  `gender` char(1) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '性別',
+  `student_id` int NULL COMMENT '學員編號',
+  `birthday` int NULL COMMENT '生日四碼',
+  `phone` int NULL COMMENT '電話末四碼',
+  `relation_keys` json DEFAULT NULL COMMENT '親眷朋友關係',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `student_id` (`student_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+            ''')
+
+            self._backup_table(relation_table_name)
+            # self._drop_table(relation_table_name)
+            self.db.perform_update(query)
+
+            columns_insert = ','.join([f'`{k}`' for k in MysqlMemberRelationEntity.VARIABLE_MAP.keys()])
+            values_insert = ','.join(['%s' for _ in MysqlMemberRelationEntity.VARIABLE_MAP.keys()])
+            query = f'INSERT INTO `{relation_table_name}` ({columns_insert}) VALUES ({values_insert})'
+            logger.info(f'Query: {query}')
+
+            members: list[GoogleMemberRelation] = service.read_all()
+            params = []
+            for member in members:
+                param = []
+                have_name = False
+                have_relation = False
+                # logger.trace(member.to_json())
+
+                for k, v in MysqlMemberRelationEntity.VARIABLE_MAP.items():
+                    value = member.__getattribute__(v)
+                    logger.trace(f'{k} -> {v} [{value}]')
+
+                    if k in ('student_id', 'phone', 'birthday'):
+                        if value is None or not value.isdigit():
+                            param.append(None)
+                        else:
+                            int_value = int(value)
+                            if k in ('phone', 'birthday'):
+                                int_value = int_value % 10000
+                            param.append(int_value)
+                    elif k == 'real_name':
+                        have_name = True
+                        param.append(full_name_to_real_name(value))
+                    elif k == 'relation_keys':
+                        if isinstance(value, list) and len(value) > 0:
+                            have_relation = True
+                            param.append(json.dumps(value))
+                    else:
+                        param.append(value)
+
+                if have_name and have_relation:
+                    params.append(tuple(param))
+                else:
+                    logger.warning(f'Error: {have_name} {have_relation} {param}')
+
+            supplier = (lambda y=x: x for x in params)
+            self.db.prepared_update(query, supplier)
+
+            logger.info(f'>>> {len(params)} 筆資料匯入')
+            return len(params)

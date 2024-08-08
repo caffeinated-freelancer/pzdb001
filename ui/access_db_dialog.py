@@ -22,11 +22,11 @@ class AccessDatabaseDialog(QDialog):
 
         buttons_and_functions = [
             [
-                ('匯整 Access 學員資料', self.merge_access_database),
-                ('匯入 Access 學員資料', self.access_to_mysql),
+                ('匯整 Access 基本資料', self.merge_access_database),
+                ('匯入 Access 基本資料', self.access_to_mysql),
             ],
             [
-                ('學員資料匯入 Access', self.member_to_access),
+                ('班級學員資料匯入 Access', self.member_to_access),
             ],
         ]
 

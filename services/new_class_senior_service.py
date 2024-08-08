@@ -216,6 +216,15 @@ class NewClassSeniorService:
     #     else:
     #         logger.warning(f'糟糕! {class_gender_key} 找不到')
 
+    def already_assigned_group(self, class_name: str, mix_member: MixMember) -> int:
+        class_gender_key = self.key_of_senior(class_name, mix_member.get_gender())
+
+        if class_gender_key in self.senior_by_class_gender:
+            return self.senior_by_class_gender[class_gender_key].already_assigned(mix_member)
+        else:
+            logger.warning(f'糟糕! {class_gender_key} 找不到')
+            return -1
+
     def add_to_pending_assignment(self, signup_class: str, mix_member: MixMember):
         class_gender_key = self.key_of_senior(signup_class, mix_member.get_gender())
 
@@ -271,7 +280,7 @@ class NewClassSeniorService:
         if class_and_gender in self.senior_by_class_gender:
             senior = self.senior_by_class_gender[class_and_gender]
             senior.add_willingness(mix_member)
-            senior.follow(introducer, mix_member)
+            senior.follow_introducer(introducer, mix_member)
 
         #
         #
@@ -282,6 +291,15 @@ class NewClassSeniorService:
         #             f'{mix_member.get_full_name()} follow {student_id} ({member.get_full_name()}) at {class_name}')
         #     else:
         #         logger.error(f'{mix_member.get_full_name()} follow {student_id} at {class_name} but not found')
+
+    def follow_non_member(self, followee: MixMember, class_name: str, follower: MixMember):
+        class_and_gender = self.key_of_senior(class_name, follower.get_gender())
+
+        if class_and_gender in self.senior_by_class_gender:
+            senior = self.senior_by_class_gender[class_and_gender]
+            senior.add_willingness(follower)
+            senior.follow_introducer(followee, follower)
+            # senior.follow(introducer, follower)
 
     def perform_follower_loop_first(self):
         # for class_and_gender in self.senior_by_class_gender.keys():
@@ -294,7 +312,8 @@ class NewClassSeniorService:
         for class_and_gender in self.senior_by_class_gender.values():
             class_and_gender.processing_unregistered_follower_chain()
 
-    def add_table_b_member(self, class_name: str, gender: str, group_id: int | None, entry: NewClassLineup):
+    def add_table_b_member(self, class_name: str, gender: str, group_id: int | None, entry: NewClassLineup,
+                           with_table_b: bool = False):
         key = self.key_of_senior(class_name, gender)
 
         if key not in self.senior_by_class_gender:
@@ -302,4 +321,4 @@ class NewClassSeniorService:
             logger.error(error_message)
             raise RuntimeError(error_message)
         else:
-            self.senior_by_class_gender[key].add_table_b_assignment(group_id, entry)
+            self.senior_by_class_gender[key].add_table_b_assignment(group_id, entry, with_table_b=with_table_b)

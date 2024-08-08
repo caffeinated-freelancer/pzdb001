@@ -1,9 +1,8 @@
 import os
 import subprocess
-from functools import partial
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QAction
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -16,7 +15,7 @@ from pz_functions.exporters.member_details_exporter import export_member_details
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
 from pz_functions.generaters.member_comparison import generate_member_comparison_table
-from pz_functions.generaters.senior import generate_senior_reports
+from pz_functions.importers.mysql_functions import write_google_relation_to_mysql
 from ui.access_db_dialog import AccessDatabaseDialog
 from ui.checkin_system_dialog import CheckinSystemDialog
 from ui.member_import_dialog import MemberImportDialog
@@ -26,6 +25,7 @@ from ui.senior_contact_dialog import SeniorContactDialog
 from ui.senior_report_common import SeniorReportCommon
 from ui.toolbox_dialog import ToolboxDialog
 from ui.ui_commons import PzUiCommons
+from ui.ui_utils import style101_button_creation
 from ui.vlookup_dialog import VLookUpDialog
 from version import __pz_version__
 
@@ -47,20 +47,32 @@ class PyPzWindows(QMainWindow):
     checkinSystemDialog: CheckinSystemDialog
     pilgrimageDialog: PilgrimageDialog
     seniorReportCommon: SeniorReportCommon
+    pzCentralLayout: QVBoxLayout
+    pzCentralWidget: QWidget
 
     def __init__(self, cfg: PzProjectConfig):
         super().__init__()
         self.config = cfg
         self.uiCommons = PzUiCommons(self, self.config)
         self.setWindowTitle(f'普中資料管理程式 v{__pz_version__}')
-        self.default_font = QFont('Microsoft YaHei', 14)
+        self.default_font = self.uiCommons.font14
         self.setFixedSize(880, 520)
-        self.generalLayout = QVBoxLayout()
 
-        centralWidget = QWidget(self)
-        centralWidget.setLayout(self.generalLayout)
-        self.setCentralWidget(centralWidget)
-        self._createButtons()
+        self.pzCentralLayout = QVBoxLayout()
+
+        # self.create_menu()
+        # self.pzCentralWidget = QWidget(self)
+        #
+        # self.pzCentralWidget.setLayout(self.fullFunctionLayout)
+        # self.pzCentralWidget.setLayout(self.simpleFunctionLayout)
+        #
+        # # self.setCentralWidget(self.fullFunctionWidget)
+        # self.setCentralWidget(self.pzCentralWidget)
+
+        self.change_to_simple_layout()
+
+        # self.create_full_function_buttons()
+        # self.create_simple_function_buttons()
         # self.dispatchDocDialog = DispatchDocDialog()
         self.seniorContactDialog = SeniorContactDialog(cfg)
         self.show()
@@ -82,6 +94,25 @@ class PyPzWindows(QMainWindow):
         # layout.addWidget(QPushButton("Center"))
         # layout.addWidget(QPushButton("Right"))
         # window.setLayout(layout)
+
+    def create_menu(self):
+        menubar = self.menuBar()
+
+        # Create a file menu
+        file_menu = menubar.addMenu('&F) 功能')
+
+        # Add actions to the file menu
+        new_action = QAction('&New', self)
+        open_action = QAction('&Open', self)
+        save_action = QAction('&Save', self)
+        exit_action = QAction('&Exit', self)
+
+        # Add actions to the file menu
+        file_menu.addAction(new_action)
+        file_menu.addAction(open_action)
+        file_menu.addAction(save_action)
+        file_menu.addSeparator()
+        file_menu.addAction(exit_action)
 
     def do_nothing(self):
         os.startfile(self.config.output_folder)
@@ -185,6 +216,15 @@ class PyPzWindows(QMainWindow):
         #     self.uiCommons.show_error_dialog(e)
         #     logger.error(e)
 
+    def google_relations_to_mysql(self):
+        try:
+            records = write_google_relation_to_mysql(self.config)
+            self.uiCommons.done()
+            self.uiCommons.show_message_dialog('Google 匯出', f'{records} 筆資料由 Google 的親眷朋友關係匯到資料庫')
+        except Exception as e:
+            self.uiCommons.show_error_dialog(e)
+            logger.error(e)
+
     def open_settings_in_notepad(self):
         # Open the file content (might launch in browser on some systems)
         subprocess.run(["notepad.exe", self.config.config_filename])
@@ -246,6 +286,7 @@ class PyPzWindows(QMainWindow):
             logger.error(e)
 
     def open_toolbox(self):
+        # self.setCentralWidget(self.uiCommons.create_a_button("button"))
         self.toolboxDialog.exec()
 
     def open_checkin_system(self):
@@ -254,52 +295,96 @@ class PyPzWindows(QMainWindow):
     def open_pilgrimage_dialog(self):
         self.pilgrimageDialog.exec()
 
-    def _createButtons(self):
-        self.buttonMap = {}
-        buttonsLayout = QGridLayout()
-        keyBoard = [
-            [('📝 禪修班結業統計', self.run_generate_graduation_reports),
-             ('📁 上課記錄', self.open_graduation_folder),
-             ('🐞 檢查學員資料差異', self.member_difference_comparing),
-             ],
-            [('📝 介紹人電聯表', self.run_introducer_report),
-             ('📁 意願調查', self.open_questionnaire_folder),
-             ('🔎 姓名 V 班級/組別🔸', self.vlookup_by_name),
-             ],
-            [('📝 學長電聯表(產生 A 表)🔸', self.run_senior_report_from_scratch),
-             ('📁 學長電聯', self.open_senior_folder),
-             ('🚎 回山排車相關作業🔸', self.open_pilgrimage_dialog),
-             ],
+    def change_to_full_layout(self):
+        try:
+            self.pzCentralLayout = QVBoxLayout()
+            self.create_full_function_buttons()
+            self.pzCentralWidget = QWidget(self)
+            self.pzCentralWidget.setLayout(self.pzCentralLayout)
+            self.setCentralWidget(self.pzCentralWidget)
+        except Exception as e:
+            self.uiCommons.show_error_dialog(e)
+
+    def change_to_simple_layout(self):
+        try:
+            self.pzCentralLayout = QVBoxLayout()
+            self.create_simple_function_buttons()
+            self.pzCentralWidget = QWidget(self)
+            self.pzCentralWidget.setLayout(self.pzCentralLayout)
+            self.setCentralWidget(self.pzCentralWidget)
+        except Exception as e:
+            self.uiCommons.show_error_dialog(e)
+
+    def create_simple_function_buttons(self):
+        buttons_and_functions = [
+            [
+                ('🔎 姓名 V 班級/組別🔸', self.vlookup_by_name),
+            ],
+            [
+                (f'🔄 Google {self.config.semester} 學員同步', self.google_to_mysql),
+            ],
+            [
+                ('🔼 切換成完整版', self.change_to_full_layout),
+            ],
+        ]
+        self.pzCentralLayout.addLayout(style101_button_creation(self.uiCommons, buttons_and_functions))
+
+    def create_full_function_buttons(self):
+        buttons_and_functions = [
+            [
+                ('📝 禪修班結業統計', self.run_generate_graduation_reports),
+                ('📁 上課記錄', self.open_graduation_folder),
+                ('🐞 檢查學員資料差異', self.member_difference_comparing),
+            ],
+            [
+                ('📝 介紹人電聯表', self.run_introducer_report),
+                ('📁 意願調查', self.open_questionnaire_folder),
+                ('🔎 姓名 V 班級/組別🔸', self.vlookup_by_name),
+            ],
+            [
+                ('📝 學長電聯表(產生 A 表)🔸', self.run_senior_report_from_scratch),
+                ('📁 學長電聯', self.open_senior_folder),
+                ('🚎 回山排車相關作業🔸', self.open_pilgrimage_dialog),
+            ],
             # [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
-            [('📝 學長電聯表(讀 B 表)', self.run_senior_report),
-             (f'🔄 Google {self.config.semester} 學員資料', self.google_to_mysql),
-             ('💾 MS Access 資料庫🔸', self.handle_ms_access),
-             ],
-            [('🔄 學員基本資料 匯入🔸', self.member_info_import),
-             ('🔄 學員基本資料 匯出', self.member_info_export),
-             ('🌀 報到系統輔助🔸', self.open_checkin_system),
-             ],
-            [('📖 開啟程式設定檔', self.open_settings_in_notepad),
-             ('📁 輸出樣版', self.open_template_folder),
-             ('🔧設計師的工具小品🔸', self.open_toolbox),
-             ]
+            [
+                ('📝 學長電聯表(讀 B 表)', self.run_senior_report),
+                (f'🔄 Google {self.config.semester} 學員同步', self.google_to_mysql),
+                ('🔄 學員基本資料 匯入🔸', self.member_info_import),
+            ],
+            [
+                ('🔙 切換成簡易版', self.change_to_simple_layout),
+                ('📁 輸出樣版', self.open_template_folder),
+                ('🔄 學員基本資料 匯出', self.member_info_export),
+            ],
+            [
+                ('💾 MS Access 資料庫🔸', self.handle_ms_access),
+                # FIXME
+                # (f'🔄 Google 親眷朋友關係同步', self.google_relations_to_mysql),
+                # ('🌀 報到系統輔助🔸', self.open_checkin_system),
+            ],
+            [
+                ('📖 開啟程式設定檔', self.open_settings_in_notepad),
+                ('🌀 報到系統輔助🔸', self.open_checkin_system),
+                ('🔧設計師的工具小品🔸', self.open_toolbox),
+            ]
             # [('開課前電聯表', self.do_nothing), ],
             # [('關懷表', self.do_nothing), ],
         ]
 
-        for row, keys in enumerate(keyBoard):
-            for col, k in enumerate(keys):
-                key = k[0]
-                func = k[1]
-                self.buttonMap[key] = QPushButton(key)
-                self.buttonMap[key].setFixedSize(280, 55)
-                self.buttonMap[key].setFont(self.uiCommons.font14)
-                if func is not None:
-                    # print(key)
-                    self.buttonMap[key].clicked.connect(partial(func))
-                buttonsLayout.addWidget(self.buttonMap[key], row, col)
+        # for row, keys in enumerate(keyBoard):
+        #     for col, k in enumerate(keys):
+        #         key = k[0]
+        #         func = k[1]
+        #         self.buttonMap[key] = QPushButton(key)
+        #         self.buttonMap[key].setFixedSize(280, 55)
+        #         self.buttonMap[key].setFont(self.uiCommons.font14)
+        #         if func is not None:
+        #             # print(key)
+        #             self.buttonMap[key].clicked.connect(partial(func))
+        #         buttonsLayout.addWidget(self.buttonMap[key], row, col)
 
-        self.generalLayout.addLayout(buttonsLayout)
+        self.pzCentralLayout.addLayout(style101_button_creation(self.uiCommons, buttons_and_functions))
 
         # output_folder_button = QPushButton('輸出樣版資料夾')
         # output_folder_button.setFixedSize(500, 60)
@@ -314,7 +399,7 @@ class PyPzWindows(QMainWindow):
         output_folder_button.setFont(self.uiCommons.font14)
         output_folder_button.clicked.connect(self.open_output_folder)
         output_button_layout.addWidget(output_folder_button)
-        self.generalLayout.addLayout(output_button_layout)
+        self.pzCentralLayout.addLayout(output_button_layout)
 
         members = ['法世', '法和', '法華', '法喜', '傳洵', '傳資']
 
@@ -325,4 +410,4 @@ class PyPzWindows(QMainWindow):
         announce.setAlignment(Qt.AlignmentFlag.AlignLeft)
         announce.setWordWrap(True)
         announce.setStyleSheet("color: brown;")
-        self.generalLayout.addWidget(announce)
+        self.pzCentralLayout.addWidget(announce)

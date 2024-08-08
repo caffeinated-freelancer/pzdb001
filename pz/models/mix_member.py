@@ -32,13 +32,14 @@ class MixMember:
         student_id = self.get_student_id()
         if student_id is not None:
             self.unique_identifier = student_id
+        elif self.signupNextInfo is not None:
+            self.unique_identifier = self.signupNextInfo.studentId
         elif self.questionnaireInfo is not None:
             self.unique_identifier = UniqueIdAllocator.get_unique_id(
                 self.questionnaireInfo.fullName, self.questionnaireInfo.mobilePhone)
-        elif self.signupNextInfo is not None:
-            self.unique_identifier = self.signupNextInfo.studentId
         elif self.newClassLineUp is not None:
-            self.unique_identifier = UniqueIdAllocator.get_unique_id(self.newClassLineUp.realName, self.newClassLineUp.phoneNumber)
+            self.unique_identifier = UniqueIdAllocator.get_unique_id(
+                self.newClassLineUp.realName, self.newClassLineUp.phoneNumber)
         else:
             raise Exception(f'嚴重錯誤: 帳號資訊不足')
 

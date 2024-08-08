@@ -20,7 +20,7 @@ from services.mysql_import_and_fetching import MySqlImportAndFetchingService
 
 class PzGrandMemberService:
     config: PzProjectConfig
-    mysql_service: MySqlImportAndFetchingService
+    mysql_service: MySqlImportAndFetchingService | None
     member_details_by_name: dict[str, list[MysqlMemberDetailEntity]]
     member_details_by_student_id: dict[int, MysqlMemberDetailEntity]
     class_members_by_name: dict[str, list[MysqlClassMemberEntity]]
@@ -36,7 +36,10 @@ class PzGrandMemberService:
                  all_via_access_db: bool = False):
         self.config = config
 
-        self.mysql_service = MySqlImportAndFetchingService(self.config)
+        if all_via_access_db:
+            self.mysql_service = None
+        else:
+            self.mysql_service = MySqlImportAndFetchingService(self.config)
 
         self.senior_by_class_and_group = {}
 
