@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QWidget, QProgressDialog
 from loguru import logger
 
 from pz.config import PzProjectConfig
-from pz.models.senior_report_error_model import SeniorReportError
+from pz.models.general_processing_error import GeneralProcessingError
 from pz_functions.generaters.senior import generate_senior_reports
 from ui.processing_done_dialog import ProcessingDoneDialog
 from ui.ui_commons import PzUiCommons
@@ -17,7 +17,7 @@ class Worker(QThread):
     from_scratch: bool
     from_excel: bool
     no_fix_senior: bool
-    errors: list[SeniorReportError]
+    errors: list[GeneralProcessingError]
     exception: Exception | None
 
     def __init__(self, config: PzProjectConfig, from_scratch: bool, from_excel: bool, no_fix_senior: bool,

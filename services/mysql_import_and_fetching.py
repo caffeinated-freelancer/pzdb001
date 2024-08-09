@@ -1,11 +1,13 @@
 import json
 import re
+from typing import Callable
 
 from loguru import logger
 
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
 from pz.cloud.spreadsheet_relations_service import PzCloudSpreadsheetRelationsService
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
+from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.google_class_member import GoogleClassMemberModel
 from pz.models.google_member_relation import GoogleMemberRelation
 from pz.models.member_detail_model import MemberDetailModel
@@ -13,6 +15,7 @@ from pz.models.member_in_access import MemberInAccessDB
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
 from pz.models.mysql_member_relation_entity import MysqlMemberRelationEntity
+from pz.models.vertical_member_lookup_result import VerticalMemberLookupResult
 from pz.mysql.db import PzMysqlDatabase
 from pz.utils import full_name_to_real_name
 from services.member_merging_service import MemberMergingService
@@ -191,7 +194,8 @@ CREATE TABLE `{self.current_table}`  (
         return entities
 
     def read_member_details(self) -> list[MysqlMemberDetailEntity]:
-        cols, results = self.db.query('SELECT * FROM `member_details`')
+        table_name = 'member_details'
+        cols, results = self.db.query(f'SELECT * FROM `{table_name}`')
         entities = []
         for result in results:
             entity = MysqlMemberDetailEntity(cols, result)
@@ -199,7 +203,8 @@ CREATE TABLE `{self.current_table}`  (
         return entities
 
     def read_member_relations(self) -> list[MysqlMemberRelationEntity]:
-        cols, results = self.db.query('SELECT * FROM `member_relationships`')
+        table_name = 'member_relationships'
+        cols, results = self.db.query(f'SELECT * FROM `{table_name}`')
         entities = []
         for result in results:
             entity = MysqlMemberRelationEntity(cols, result)
@@ -252,7 +257,8 @@ CREATE TABLE `{self.current_table}`  (
                     logger.warning(f'student_id:{entry.student_id}')
         return records, count
 
-    def google_relation_to_mysql(self) -> int:
+    def google_relation_to_mysql(self, lookup: Callable[[GoogleMemberRelation], VerticalMemberLookupResult]) -> tuple[
+        int, list[GeneralProcessingError]]:
         settings: PzProjectGoogleSpreadsheetConfig = self.config.google.spreadsheets.get('relationships')
 
         relation_table_name = 'member_relationships'
@@ -288,9 +294,47 @@ CREATE TABLE `{relation_table_name}`  (
             query = f'INSERT INTO `{relation_table_name}` ({columns_insert}) VALUES ({values_insert})'
             logger.info(f'Query: {query}')
 
+            errors: list[GeneralProcessingError] = []
             members: list[GoogleMemberRelation] = service.read_all()
             params = []
             for member in members:
+                v_look_result = lookup(member)
+
+                if v_look_result.has_error():
+                    errors.append(v_look_result.error)
+                    continue
+
+                if v_look_result.is_member():
+                    # member.dharmaName = v_look_result.get_dharma_name()
+                    member.gender = v_look_result.get_gender()
+
+                    if member.studentId is None or member.studentId == '':
+                        member.studentId = str(v_look_result.get_student_id())
+                        errors.append(
+                            GeneralProcessingError.info(f'{v_look_result.get_real_name()} 的學號為 {member.studentId}'))
+
+                    if member.fullName is None or member.fullName == '':
+                        member.fullName = member.realName = v_look_result.get_real_name()
+                        errors.append(
+                            GeneralProcessingError.info(
+                                f'學員編號 {v_look_result.get_student_id()} 的姓名為 {v_look_result.get_real_name()}'))
+                    else:
+                        real_name = full_name_to_real_name(member.fullName)
+                        if real_name != v_look_result.get_real_name():
+                            errors.append(GeneralProcessingError.error(
+                                f'學員編號 {v_look_result.get_student_id()} 的姓名為 {v_look_result.get_real_name()} 不是 {real_name}'))
+
+                    if member.dharmaName is None or member.dharmaName == '':
+                        if v_look_result.get_dharma_name() is not None and v_look_result.get_dharma_name() != '':
+                            member.dharmaName = v_look_result.get_dharma_name()
+                            errors.append(GeneralProcessingError.info(
+                                f'學員  {v_look_result.get_real_name()}/{v_look_result.get_student_id()} 的法名為 {v_look_result.get_dharma_name()}'))
+                    elif v_look_result.get_dharma_name() is not None and v_look_result.get_dharma_name() != '':
+                        if member.dharmaName != v_look_result.get_dharma_name():
+                            member.dharmaName = v_look_result.get_dharma_name()
+                            errors.append(GeneralProcessingError.info(
+                                f'學員  {v_look_result.get_real_name()}/{v_look_result.get_student_id()} 的法名為 {v_look_result.get_dharma_name()} 不是 {member.dharmaName}'))
+
                 param = []
                 have_name = False
                 have_relation = False
@@ -327,4 +371,4 @@ CREATE TABLE `{relation_table_name}`  (
             self.db.prepared_update(query, supplier)
 
             logger.info(f'>>> {len(params)} 筆資料匯入')
-            return len(params)
+            return len(params), errors

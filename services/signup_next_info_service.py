@@ -7,7 +7,7 @@ from pz.config import PzProjectConfig
 from pz.models.auto_assignment_step import AutoAssignmentStepEnum
 from pz.models.mix_member import MixMember
 from pz.models.new_class_senior import NewClassSeniorModel
-from pz.models.senior_report_error_model import SeniorReportError
+from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.signup_next_info import SignupNextInfoModel
 from pz.pz_commons import ACCEPTABLE_CLASS_NAMES
 from services.excel_workbook_service import ExcelWorkbookService
@@ -95,8 +95,8 @@ class SignupNextInfoService:
             entries.append(entry)
         return entries
 
-    def pre_processing(self, from_excel: bool = False, for_table_b: bool = False) -> list[SeniorReportError]:
-        errors: list[SeniorReportError] = []
+    def pre_processing(self, from_excel: bool = False, for_table_b: bool = False) -> list[GeneralProcessingError]:
+        errors: list[GeneralProcessingError] = []
 
         if from_excel:
             workbook = ExcelWorkbookService(SignupNextInfoModel({}),
@@ -129,7 +129,7 @@ class SignupNextInfoService:
             if member_tuple is None:
                 error_message = f'糟糕: {entry.studentId} / {entry.fullName} 不存在資料庫'
                 logger.error(error_message)
-                errors.append(SeniorReportError.error(error_message))
+                errors.append(GeneralProcessingError.error(error_message))
                 continue
 
             mix_member = MixMember(member_tuple[0], member_tuple[1], None, entry)

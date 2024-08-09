@@ -9,7 +9,7 @@ from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.pz_questionnaire_info import PzQuestionnaireInfo
 from pz.models.questionnaire_entry import QuestionnaireEntry
-from pz.models.senior_report_error_model import SeniorReportError
+from pz.models.general_processing_error import GeneralProcessingError
 from pz.pz_commons import phone_number_normalize
 from pz.utils import full_name_to_names
 from services.classmate_request_service import ClassmateRequestService
@@ -84,8 +84,8 @@ class QuestionnaireService:
             self.duplicate_detection_set.add(key)
             return False
 
-    def pre_processing(self, spreadsheet_file: str) -> tuple[list[SeniorReportError], list[QuestionnaireEntry]]:
-        errors: list[SeniorReportError] = []
+    def pre_processing(self, spreadsheet_file: str) -> tuple[list[GeneralProcessingError], list[QuestionnaireEntry]]:
+        errors: list[GeneralProcessingError] = []
         self.all_questionnaires_entries = []
 
         service = ExcelWorkbookService(PzQuestionnaireInfo({}), spreadsheet_file,
@@ -114,7 +114,7 @@ class QuestionnaireService:
 
                 if self.check_duplication_and_save(entry):
                     message = f'意願調查中, {entry.fullName}, 姓別: {entry.gender}, 班級: {entry.registerClass}, 行動電話 {entry.mobilePhone} 資料重複'
-                    errors.append(SeniorReportError.warning(message))
+                    errors.append(GeneralProcessingError.warning(message))
                     logger.warning(message)
                     continue
 
@@ -124,7 +124,7 @@ class QuestionnaireService:
                             message = f'意願調查中, {entry.fullName}/{entry.registerClass} 在基本資料中有同名, 但生日資料欠缺, 疑似學員編號為 {m[0].student_id}'
                         else:
                             message = f'意願調查中, {entry.fullName}/{entry.registerClass} 在基本資料中有同名, 但性別資料欠缺, 疑似學員編號為 {m[0].student_id}'
-                        errors.append(SeniorReportError.warning(message))
+                        errors.append(GeneralProcessingError.warning(message))
                         logger.warning(message)
                     elif m[0].birthday == entry.birthday and m[0].gender == entry.gender:
                         mix_member = MixMember(m[0], m[1], entry, None)
@@ -171,8 +171,8 @@ class QuestionnaireService:
 
         return errors, self.all_questionnaires_entries
 
-    def pre_processing_non_member_classmate(self) -> list[SeniorReportError]:
-        errors: list[SeniorReportError] = []
+    def pre_processing_non_member_classmate(self) -> list[GeneralProcessingError]:
+        errors: list[GeneralProcessingError] = []
 
         ClassmateRequestService.initialize()
         # classmates_requests: list[NonMemberClassmateRequest] = []
@@ -193,7 +193,7 @@ class QuestionnaireService:
                                 }」同組, 但「{follower.questionnaireInfo.fullName}」是「{follower.questionnaireInfo.gender
                                 }生」, 但「{followee.entry.fullName}」是「{followee.entry.gender}生」'
                                 logger.warning(message)
-                                errors.append(SeniorReportError.warning(message))
+                                errors.append(GeneralProcessingError.warning(message))
                             elif followee.entry.registerClass == follower.questionnaireInfo.registerClass:
                                 ClassmateRequestService.add_request(followee, follower)
                                 follower.questionnaireInfo.add_non_member_followee(followee)
@@ -205,7 +205,7 @@ class QuestionnaireService:
                                 }」同組, 但「{follower.questionnaireInfo.fullName}」上「{follower.questionnaireInfo.registerClass
                                 }」但「{followee.entry.fullName}」上「{followee.entry.registerClass}」'
                                 logger.warning(message)
-                                errors.append(SeniorReportError.warning(message))
+                                errors.append(GeneralProcessingError.warning(message))
 
                 # if len(non_same_class_followers) > 0:
                 #     for follower in non_same_class_followers:
@@ -220,18 +220,18 @@ class QuestionnaireService:
                         message = f'「{follower.questionnaireInfo.fullName}」與「{non_member_classmate
                         }」同組, 但在禪修意願表中, 沒有找到選修「{follower.questionnaireInfo.registerClass
                         }」且性別為「{follower.questionnaireInfo.gender}性」而姓名為「{non_member_classmate}」的人。'
-                        errors.append(SeniorReportError.warning(message))
+                        errors.append(GeneralProcessingError.warning(message))
                         logger.warning(message)
 
         if ClassmateRequestService.count() > 0:
             for r in ClassmateRequestService.all_requests():
                 message = f'「{r.follower.questionnaireInfo.fullName}」想與「{r.followee.entry.fullName}」同組, 但因程式尚不支援, 請記得手動檢查並調整。'
-                errors.append(SeniorReportError.warning(message))
+                errors.append(GeneralProcessingError.warning(message))
 
         return errors
 
-    def pre_processing_assignment(self, with_table_b: bool = False) -> list[SeniorReportError]:
-        errors: list[SeniorReportError] = []
+    def pre_processing_assignment(self, with_table_b: bool = False) -> list[GeneralProcessingError]:
+        errors: list[GeneralProcessingError] = []
 
         if with_table_b:
             questionnaires_entries = []

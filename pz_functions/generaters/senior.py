@@ -15,7 +15,7 @@ from pz.models.new_class_senior import NewClassSeniorModel
 from pz.models.questionnaire_entry import QuestionnaireEntry
 from pz.models.senior_contact_advanced import SeniorContactAdvanced
 from pz.models.senior_contact_fundamental import SeniorContactFundamental
-from pz.models.senior_report_error_model import SeniorReportError
+from pz.models.general_processing_error import GeneralProcessingError
 from pz.pz_commons import ACCEPTABLE_CLASS_NAMES, phone_number_normalize
 from services.excel_creation_service import ExcelCreationService
 from services.excel_template_service import ExcelTemplateService
@@ -43,7 +43,7 @@ class SeniorReportGenerator:
     signup_next_service: SignupNextInfoService
     prev_senior_service: PreviousSeniorService
     questionnaire_service: QuestionnaireService
-    initial_errors: list[SeniorReportError]
+    initial_errors: list[GeneralProcessingError]
 
     # prev_class_senior_map: dict[str, NewClassSeniorModel]  # 舊的班級學長到哪了
 
@@ -88,7 +88,7 @@ class SeniorReportGenerator:
         if self.fp is not None:
             self.fp.close()
 
-    def get_initial_errors(self) -> list[SeniorReportError]:
+    def get_initial_errors(self) -> list[GeneralProcessingError]:
         return self.initial_errors
 
     @staticmethod
@@ -98,8 +98,8 @@ class SeniorReportGenerator:
     def _auto_assignment(self,
                          spreadsheet_file: str, from_excel: bool = False,
                          no_fix_senior: bool = False,
-                         with_table_b: bool = False) -> list[SeniorReportError]:
-        errors: list[SeniorReportError] = []
+                         with_table_b: bool = False) -> list[GeneralProcessingError]:
+        errors: list[GeneralProcessingError] = []
 
         # 預先處理, 記載每個學員的升班意願
         # 這裡不會把學員排進班級, 只是記載學員們的升班意願供後續查詢使用。
@@ -285,9 +285,9 @@ class SeniorReportGenerator:
 
     def processing_senior_report(self, spreadsheet_file: str,
                                  from_excel: bool = False, from_scratch: bool = True, no_fix_senior: bool = False,
-                                 with_table_b: bool = False) -> list[SeniorReportError]:
+                                 with_table_b: bool = False) -> list[GeneralProcessingError]:
 
-        errors: list[SeniorReportError] = []
+        errors: list[GeneralProcessingError] = []
 
         if from_scratch:
             err = self._auto_assignment(spreadsheet_file, from_excel=from_excel, no_fix_senior=no_fix_senior,
@@ -499,7 +499,7 @@ class SeniorReportGenerator:
 def generate_senior_reports(cfg: PzProjectConfig,
                             from_scratch: bool, from_excel: bool | None = None,
                             no_fix_senior: bool = False,
-                            with_table_b: bool = False) -> list[SeniorReportError]:
+                            with_table_b: bool = False) -> list[GeneralProcessingError]:
     if not from_scratch:
         if not os.path.exists(cfg.excel.new_class_predefined_info.spreadsheet_file):
             from_scratch = True

@@ -8,7 +8,7 @@ from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
-from pz.models.senior_report_error_model import SeniorReportError
+from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.signup_next_info import SignupNextInfoModel
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
@@ -21,7 +21,7 @@ class NewClassSeniorService:
     senior_by_student_id: dict[int, list[NewClassSeniorModel]]
     all_classes: dict[str, list[NewClassSeniorModel]]
     member_service: PzGrandMemberService
-    initial_errors: list[SeniorReportError]
+    initial_errors: list[GeneralProcessingError]
 
     def __init__(self, cfg: PzProjectConfig, member_service: PzGrandMemberService):
         self.config = cfg
@@ -38,8 +38,8 @@ class NewClassSeniorService:
         err = self._add_new_default_member(new_class_seniors)
         self.initial_errors.extend(err)
 
-    def _init_new_classes_by_senior(self, new_class_seniors: list[NewClassSeniorModel]) -> list[SeniorReportError]:
-        errors: list[SeniorReportError] = []
+    def _init_new_classes_by_senior(self, new_class_seniors: list[NewClassSeniorModel]) -> list[GeneralProcessingError]:
+        errors: list[GeneralProcessingError] = []
         group_id_assignment: dict[str, int] = {}
 
         for senior in new_class_seniors:
@@ -57,7 +57,7 @@ class NewClassSeniorService:
             if senior_infos is None or senior_infos[0] is None:
                 message = f'糟糕: 學長 {senior.fullName} / {senior.deacon} 在後端資料庫中找不到'
                 logger.warning(message)
-                errors.append(SeniorReportError.warning(message))
+                errors.append(GeneralProcessingError.warning(message))
                 continue
 
             senior.studentId = int(senior_infos[0].student_id)
@@ -73,14 +73,14 @@ class NewClassSeniorService:
                     senior.groupId = 101
                     message = f'班級 {senior.className} / {senior.gender} / {senior.fullName} 沒有組別'
                     logger.warning(message)
-                    errors.append(SeniorReportError.warning(message))
+                    errors.append(GeneralProcessingError.warning(message))
                 group_id_assignment[senior.className] = senior.groupId
             else:
                 key = self.key_of_senior_by_group_id(senior.className, senior.groupId)
                 if key in self.senior_by_class_group:
                     message = f'班級 {senior.className}, 組別 {senior.groupId} 重覆'
                     logger.warning(message)
-                    errors.append(SeniorReportError.warning(message))
+                    errors.append(GeneralProcessingError.warning(message))
                 else:
                     self.senior_by_class_group[key] = senior
 
@@ -95,8 +95,8 @@ class NewClassSeniorService:
             self.all_classes[clazz].sort(key=lambda x: x.groupId)
         return errors
 
-    def _add_new_default_member(self, new_class_seniors: list[NewClassSeniorModel]) -> list[SeniorReportError]:
-        errors: list[SeniorReportError] = []
+    def _add_new_default_member(self, new_class_seniors: list[NewClassSeniorModel]) -> list[GeneralProcessingError]:
+        errors: list[GeneralProcessingError] = []
         logger.debug(f'Assignment Step {AutoAssignmentStepEnum.PREDEFINED_SENIOR}')
         for entry in new_class_seniors:
             member_tuple = self.member_service.find_grand_member_by_pz_name_and_dharma_name(
@@ -105,7 +105,7 @@ class NewClassSeniorService:
             if member_tuple is None:
                 message = f'學長 姓名：{entry.fullName}，法名：{entry.dharmaName if entry is not None else ''}，姓別：{entry.gender} 在資料庫中找不到'
                 logger.warning(message)
-                errors.append(SeniorReportError.warning(message))
+                errors.append(GeneralProcessingError.warning(message))
                 continue
 
             signup_next = SignupNextInfoModel({})

@@ -1,5 +1,36 @@
 # Change Log
 
+## [1.3.1] - 2024-8-9
+
+### Added
+
+- 增加親眷朋友關係由 Google 試算表匯入資料庫
+- 設定檔增加 Google 的資訊
+
+```yaml
+google:
+  spreadsheets:
+    # 親眷朋友關係
+    relationships:
+      spreadsheet_id: '試算表的 Google ID'
+      sheet_name: '親眷朋友關係'
+      header_row: 2
+      fields_map:
+        'fullName': '姓名'
+        'dharmaName': '法名'
+        'gender': '性別'
+        'studentId': '學員編號'
+        'birthday': '生日末四碼'
+        'phone': '行動電話末四碼'
+        'relationKeys':
+          - '關係代碼1'
+          - '關係代碼2'
+          - '關係代碼3'
+          - '關係代碼4'
+          - '關係代碼5'
+          - '關係代碼6' 
+```
+
 ## [1.3.0] - 2024-8-8
 
 ### Added

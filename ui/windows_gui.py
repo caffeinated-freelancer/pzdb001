@@ -218,9 +218,20 @@ class PyPzWindows(QMainWindow):
 
     def google_relations_to_mysql(self):
         try:
-            records = write_google_relation_to_mysql(self.config)
-            self.uiCommons.done()
-            self.uiCommons.show_message_dialog('Google 匯出', f'{records} 筆資料由 Google 的親眷朋友關係匯到資料庫')
+            records, errors = write_google_relation_to_mysql(self.config)
+            label = QLabel()
+            label.setFont(self.uiCommons.font14)
+            label.setText(f'{records} 筆親眷朋友關係資料匯入')
+
+            if len(errors) > 0:
+                dialog = ProcessingDoneDialog(
+                    self.config, '完親眷朋友關係匯到資料庫', ['等級', '警告訊息'], [
+                        [x.level_name(), x.message] for x in errors
+                    ], [[label]])
+                dialog.exec()
+            else:
+                self.uiCommons.done()
+                self.uiCommons.show_message_dialog('Google 匯出', f'{records} 筆資料由 Google 的親眷朋友關係匯到資料庫')
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
             logger.error(e)
@@ -360,7 +371,7 @@ class PyPzWindows(QMainWindow):
             [
                 ('💾 MS Access 資料庫🔸', self.handle_ms_access),
                 # FIXME
-                # (f'🔄 Google 親眷朋友關係同步', self.google_relations_to_mysql),
+                (f'🔄 Google 親眷朋友關係同步', self.google_relations_to_mysql),
                 # ('🌀 報到系統輔助🔸', self.open_checkin_system),
             ],
             [
