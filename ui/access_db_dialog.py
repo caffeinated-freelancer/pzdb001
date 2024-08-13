@@ -3,7 +3,7 @@ from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz_functions.exporters.member_to_access import member_to_access_db
-from pz_functions.importers.mysql_functions import write_access_to_mysql
+from pz_functions.importers.mysql_functions import write_access_to_mysql, migrate_access_table_to_mysql
 from pz_functions.mergers.member_merging import member_data_merging
 from ui.ui_commons import PzUiCommons
 from ui.ui_utils import style101_dialog_layout
@@ -27,6 +27,7 @@ class AccessDatabaseDialog(QDialog):
             ],
             [
                 ('班級學員資料匯入 Access', self.member_to_access),
+                ('Access 資料表轉 MySQL', self.migrate_access_table_to_mysql),
             ],
         ]
 
@@ -49,6 +50,16 @@ class AccessDatabaseDialog(QDialog):
             self.uiCommons.done()
             self.uiCommons.show_message_dialog(
                 '學員基本資料匯入', '完成匯入： 學員基本資料 由 MS-Access 資料庫匯入 MySQL 資料庫')
+        except Exception as e:
+            self.uiCommons.show_error_dialog(e)
+            logger.error(e)
+
+    def migrate_access_table_to_mysql(self):
+        try:
+            migrate_access_table_to_mysql(self.config)
+            self.uiCommons.done()
+            self.uiCommons.show_message_dialog(
+                '資料表移轉', '完成由 MS-Access 表匯入 MySQL')
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
             logger.error(e)

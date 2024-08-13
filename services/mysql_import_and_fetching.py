@@ -21,6 +21,16 @@ from pz.utils import full_name_to_real_name
 from services.member_merging_service import MemberMergingService
 
 
+class MySqlEntityHelper:
+    clazz: type
+
+    def __init__(self, clazz: type):
+        self.clazz = clazz
+
+    def write(self, entity):
+        pass
+
+
 class MySqlImportAndFetchingService:
     config: PzProjectConfig
     db: PzMysqlDatabase
@@ -372,3 +382,11 @@ CREATE TABLE `{relation_table_name}`  (
 
             logger.info(f'>>> {len(params)} 筆資料匯入')
             return len(params), errors
+
+    def drop_and_create_table(self, table_name: str, creation_query: str):
+        self._drop_table(table_name)
+        self.db.perform_update(creation_query)
+
+    @staticmethod
+    def mysql_creation_query(table_name: str, columns_in_mysql: list[str]) -> str:
+        return f"CREATE TABLE {table_name} ({', \n'.join(columns_in_mysql)}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"

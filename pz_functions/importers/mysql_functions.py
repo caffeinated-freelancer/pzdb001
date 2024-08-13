@@ -3,6 +3,7 @@ from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.google_member_relation import GoogleMemberRelation
 from pz.models.vertical_member_lookup_result import VerticalMemberLookupResult
 from pz.vlookup_commons import vertical_member_lookup
+from services.access_db_migration import AccessDBMigration
 from services.grand_member_service import PzGrandMemberService
 from services.member_merging_service import MemberMergingService
 from services.mysql_import_and_fetching import MySqlImportAndFetchingService
@@ -44,3 +45,8 @@ def write_google_relation_to_mysql(cfg: PzProjectConfig) -> tuple[int, list[Gene
     mysql_import_and_fetching = MySqlImportAndFetchingService(cfg)
 
     return mysql_import_and_fetching.google_relation_to_mysql(lambda x: handle_lookup(gms, x))
+
+
+def migrate_access_table_to_mysql(cfg: PzProjectConfig):
+    mig = AccessDBMigration(cfg)
+    mig.migrate()

@@ -47,6 +47,8 @@ def data_by_class_and_group(a: dict[str, Any], b: dict[str, Any]) -> int:
         return group_id_a - group_id_b
 
     introducer_tag = '介紹人'
+    gender = '性別'
+    student_name_tag = '學員姓名'
 
     if introducer_tag in a and introducer_tag in b:
         try:
@@ -54,30 +56,20 @@ def data_by_class_and_group(a: dict[str, Any], b: dict[str, Any]) -> int:
                 return -1 if a[introducer_tag] < b[introducer_tag] else 1
         except:
             pass
-        finally:
-            return 0
     elif introducer_tag in a:
         return -1
     elif introducer_tag in b:
         return 1
     else:
-        return 0
-
-    class_name_a = class_name_to_integer(a['報名班別'])
-    class_name_b = class_name_to_integer(b['報名班別'])
-
-    if class_name_a != class_name_b:
-        return class_name_a - class_name_b
-
-    gender = '性別'
+        logger.debug(f"{a[student_name_tag]} 跟 {b[introducer_tag]} 都沒有介紹人")
 
     if gender in a and gender in b:
         if a[gender] is not None and b[gender] is not None:
             if a[gender] != b[gender]:
                 return -1 if a[gender] < b[gender] else 1
 
-    if a['學員姓名'] != b['學員姓名']:
-        return -1 if a['學員姓名'] < b['學員姓名'] else 1
+    if a[student_name_tag] != b[student_name_tag]:
+        return -1 if a[student_name_tag] < b[student_name_tag] else 1
     return 0
 
 
