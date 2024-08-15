@@ -22,24 +22,30 @@ class AccessDatabaseDialog(QDialog):
 
         buttons_and_functions = [
             [
-                ('匯整 Access 基本資料', self.merge_access_database),
-                ('匯入 Access 基本資料', self.access_to_mysql),
+                # ('匯整 Access 基本資料', self.merge_access_database),
+                ('🔜 [A->M] 匯入學員基本資料 (Details)', self.access_to_mysql),
             ],
             [
-                ('班級學員資料匯入 Access', self.member_to_access),
-                ('Access 資料表轉 MySQL', self.migrate_access_table_to_mysql),
+                ('🔜 [A->M] 匯入學員基本資料 (Basics)', self.migrate_access_table_to_mysql),
+            ],
+            [
+                ('🔙 [M->A] 班級學員資料匯入 Access', self.member_to_access),
             ],
         ]
 
-        self.resize(550, 400)
+        self.resize(550, 600)
 
         layout = style101_dialog_layout(self, self.uiCommons, buttons_and_functions, html=f'''
     <h3>MS-Access 資料庫說明</h3>
     <ol>
+    <li><font color="blue">[A-&gt;M]</font> 是指從 Access 匯入 MySQL, 而 <font color="blue">[M-&gt;A]</font> 則是由 MySQL 匯入 Access。</li>
     <li>MS-Access 資料庫是做為 Excel 快速匯入的一個暫用資料庫，因為 MS-Access 資料庫是單機模式，所以只是暫時借用。</li>
-    <li>個資電腦因為不能連精舍資料庫，如果個資電腦有支援使用 MS-Access 的話，我們仍會使用 MS-Access 來輔助處理資料。</li>
+    <li>把班級學員資料匯入 Access 的目的是: 當電腦若不能連資料庫，則可自帶一份 MS-Access 單機處理。</li>
+    <li>Details 是原本人工匯整多個殘破資料表而來，大部份的程式碼都是讀取這個表。</li>
+    <li>Basics 來自資料源，它比 Details 更 detail，但程式並不支援它。目前的做法是在 Access 上，直接把 Basic 覆蓋 Details 
+    來讓程式可以不必做太多的修改。</li>
     </ol>
-            ''')
+            ''', button_width=500)
         self.setLayout(layout)
 
         # Connect button click to slot (method)
@@ -56,10 +62,10 @@ class AccessDatabaseDialog(QDialog):
 
     def migrate_access_table_to_mysql(self):
         try:
-            migrate_access_table_to_mysql(self.config)
+            count = migrate_access_table_to_mysql(self.config)
             self.uiCommons.done()
             self.uiCommons.show_message_dialog(
-                '資料表移轉', '完成由 MS-Access 表匯入 MySQL')
+                '資料表移轉', f'完成由 MS-Access 表匯入 {count} 筆資料到 MySQL')
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
             logger.error(e)

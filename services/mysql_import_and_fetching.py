@@ -17,7 +17,7 @@ from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
 from pz.models.mysql_member_relation_entity import MysqlMemberRelationEntity
 from pz.models.vertical_member_lookup_result import VerticalMemberLookupResult
 from pz.mysql.db import PzMysqlDatabase
-from pz.utils import full_name_to_real_name
+from pz.utils import full_name_to_real_name, simple_phone_number_normalization
 from services.member_merging_service import MemberMergingService
 
 
@@ -76,7 +76,11 @@ class MySqlImportAndFetchingService:
             entry = MemberInAccessDB(cols, result)
             param = [int(entry.student_id)]
             for _, v in MemberInAccessDB.ATTRIBUTES_MAP.items():
-                param.append(entry.__getattribute__(v))
+                value = entry.__getattribute__(v)
+                if v.endswith('_phone'):
+                    value = simple_phone_number_normalization(value)
+
+                param.append(value)
             # print(param)
             params.append(tuple(param))
 

@@ -23,10 +23,10 @@ class VLookUpDialog(QDialog):
 
         buttons_and_functions = [
             [('開啟 Excel 檔 (💻 一般電腦用)', self.vlookup_by_name)],
-            [('開啟 Excel 檔 (🔒 個資電腦用)', self.vlookup_by_name_using_access)],
+            [('開啟 Excel 檔 (🔒 使用 Access 電腦)', self.vlookup_by_name_using_access)],
         ]
 
-        self.resize(550, 620)
+        self.resize(550, 660)
 
         layout = style101_dialog_layout(self, self.uiCommons, buttons_and_functions, button_width=500, html=f'''
     <h3>姓名 V 班級/組別</h3>
@@ -43,6 +43,7 @@ class VLookUpDialog(QDialog):
 <li>出生日期 : 空白時回填</li>
 <li>行動電話 : 空白時回填</li>
 <li>住家電話 : 空白時回填</li>
+<li>護法會職稱 : 空白時回填</li>
 </ul></li>
 <li>以姓名 vlookup 時, 可在必要時加法名輔助, 加法名輔助的方式有兩種:
 <ul>

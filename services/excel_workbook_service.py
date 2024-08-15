@@ -105,6 +105,7 @@ class ExcelWorkbookService:
             if value is not None:
                 if isinstance(value, str):
                     value = cell.value.replace('\r', '').replace('\n', '')
+                    value = value.strip()
                 # print("[", value, "]")
                 if self.ignore_parenthesis:
                     matched = re.match(r'^\s*(.*\S)\s*\(.*', value)

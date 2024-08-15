@@ -1,43 +1,36 @@
 import json
 
+from pz.models.mysql_member_basic_entity import MysqlMemberBasicEntity
+
 
 def static_init(args):
     pass
 
 
 class MemberInAccessDB:
-    ATTRIBUTES_MAP = {
-        '學員編號': 'student_id',
-        '姓名': 'real_name',
-        '性別': 'gender',
-        '出生日期': 'birthday',
-        '緊急聯絡人': 'emergency_contact',
-        '緊急聯絡人法名': 'emergency_contact_dharma_name',
-        '緊急聯絡人稱謂': 'emergency_contact_relationship',
-        '緊急聯絡人電話': 'emergency_contact_phone',
-        '行動電話': 'mobile_phone',
-        '住家電話': 'home_phone',
-        '身分證字號': 'personal_id',
-        '法名': 'dharma_name',
-        '資料來源': 'source',
-        '備註': 'remark',
-    }
+    ATTRIBUTES_MAP = MysqlMemberBasicEntity.PZ_MYSQL_COLUMN_NAMES
     initialized = False
 
     student_id: str
     real_name: str
+    dharma_name: str
     gender: str
     birthday: str
+    mobile_phone: str
+    home_phone: str
+    email: str
     emergency_contact: str
     emergency_contact_dharma_name: str
     emergency_contact_relationship: str
     emergency_contact_phone: str
-    mobile_phone: str
-    home_phone: str
     personal_id: str
-    dharma_name: str
-    source: str
-    remark: str
+    dharma_protection_position: str
+    family_code: str
+    family_id: str
+    family_code_name: str
+    threefold_refuge: str
+    five_precepts: str
+    bodhisattva_vow: str
 
     def __init__(self, mapping, data):
         # if not MemberInAccessDB.initialized:

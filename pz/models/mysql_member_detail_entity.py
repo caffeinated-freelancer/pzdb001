@@ -6,20 +6,28 @@ from .member_in_access import MemberInAccessDB
 
 class MysqlMemberDetailEntity(JSONClass):
     id: int
+
     student_id: str
     real_name: str
+    dharma_name: str
     gender: str
     birthday: str
+    mobile_phone: str
+    home_phone: str
+    email: str
     emergency_contact: str
     emergency_contact_dharma_name: str
     emergency_contact_relationship: str
     emergency_contact_phone: str
-    mobile_phone: str
-    home_phone: str
     personal_id: str
-    dharma_name: str
-    source: str
-    remark: str
+    dharma_protection_position: str
+    # ct_world_id: str
+    family_code: str
+    family_id: str
+    family_code_name: str
+    threefold_refuge: str
+    five_precepts: str
+    bodhisattva_vow: str
 
     @staticmethod
     def from_access_db(model: MemberInAccessDB) -> 'MysqlMemberDetailEntity':

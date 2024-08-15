@@ -17,6 +17,7 @@ class VLookUpModel(ExcelModelInterface):
         'homePhone': '住家電話',
         # 'personalId': '身分證字號',
         'birthday': '出生日期',
+        'dharmaProtectionPosition': '護法會職稱',
     }
 
     TO_MYSQL_CLASS_MEMBER_MAP = {
@@ -34,6 +35,7 @@ class VLookUpModel(ExcelModelInterface):
         'homePhone': 'home_phone',
         # 'personalId': 'class_group',
         'birthday': 'birthday',
+        'dharmaProtectionPosition': 'dharma_protection_position',
     }
 
     studentId: str | None
@@ -47,6 +49,7 @@ class VLookUpModel(ExcelModelInterface):
     mobilePhone: str | None
     homePhone: str | None
     birthday: str | None
+    dharmaProtectionPosition: str | None
 
     # personalId: str | None
 

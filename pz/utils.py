@@ -110,6 +110,11 @@ def normalize_phone_number(phone_number: str) -> tuple[str | None, bool]:
     return phone_number, False
 
 
+def simple_phone_number_normalization(phone_number: str | None) -> str | None:
+    normalization_phone_number, _ = normalize_phone_number(phone_number)
+    return normalization_phone_number
+
+
 def tuple_to_coordinate(row, col):
     """Converts a (row, column) tuple to its corresponding Excel coordinate,
        supporting columns beyond XFD (maximum column)."""

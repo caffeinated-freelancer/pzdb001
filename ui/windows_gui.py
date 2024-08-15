@@ -371,7 +371,7 @@ class PyPzWindows(QMainWindow):
             [
                 ('💾 MS Access 資料庫🔸', self.handle_ms_access),
                 # FIXME
-                (f'🔄 Google 親眷朋友關係同步', self.google_relations_to_mysql),
+                # (f'🔄 Google 親眷朋友關係同步', self.google_relations_to_mysql),
                 # ('🌀 報到系統輔助🔸', self.open_checkin_system),
             ],
             [

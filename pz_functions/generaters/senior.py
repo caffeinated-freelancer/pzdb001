@@ -6,6 +6,7 @@ from typing import Any
 from loguru import logger
 
 from pz.config import PzProjectConfig
+from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
@@ -15,7 +16,6 @@ from pz.models.new_class_senior import NewClassSeniorModel
 from pz.models.questionnaire_entry import QuestionnaireEntry
 from pz.models.senior_contact_advanced import SeniorContactAdvanced
 from pz.models.senior_contact_fundamental import SeniorContactFundamental
-from pz.models.general_processing_error import GeneralProcessingError
 from pz.pz_commons import ACCEPTABLE_CLASS_NAMES, phone_number_normalize
 from services.excel_creation_service import ExcelCreationService
 from services.excel_template_service import ExcelTemplateService
@@ -427,8 +427,21 @@ class SeniorReportGenerator:
         entries: list[NewClassGroupStatistics] = []
         for class_name in self.new_senior_service.all_classes:
             seniors = self.new_senior_service.all_classes[class_name]
+            total = 0
+            male = 0
+            female = 0
             for senior in seniors:
-                entries.append(NewClassGroupStatistics(senior))
+                total += len(senior.members)
+                if senior.gender == '女':
+                    female += len(senior.members)
+                else:
+                    male += len(senior.members)
+
+            for senior in seniors:
+                if senior.gender == '女':
+                    entries.append(NewClassGroupStatistics(senior, 0, female, total))
+                else:
+                    entries.append(NewClassGroupStatistics(senior, male, 0, total))
 
         service = ExcelCreationService(entries[0])
 

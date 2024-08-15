@@ -47,6 +47,6 @@ def write_google_relation_to_mysql(cfg: PzProjectConfig) -> tuple[int, list[Gene
     return mysql_import_and_fetching.google_relation_to_mysql(lambda x: handle_lookup(gms, x))
 
 
-def migrate_access_table_to_mysql(cfg: PzProjectConfig):
+def migrate_access_table_to_mysql(cfg: PzProjectConfig) -> int:
     mig = AccessDBMigration(cfg)
-    mig.migrate()
+    return mig.migrate()

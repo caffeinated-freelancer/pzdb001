@@ -1,15 +1,19 @@
+import json
+
 from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz.models.mysql_member_basic_entity import MysqlMemberBasicEntity
 from pz.models.mysql_member_more_basic_entity import MysqlMemberMoreBasicEntity
 from pz.ms_access.db import PzDatabase
+from pz.mysql.db import PzMysqlDatabase
 from services.mysql_import_and_fetching import MySqlImportAndFetchingService
 
 
 class AccessDBMigration:
     config: PzProjectConfig
     pzDb: PzDatabase
+    db: PzMysqlDatabase
     dbFile: str
 
     def __init__(self, cfg: PzProjectConfig, db_file: str | None = None) -> None:
@@ -19,28 +23,43 @@ class AccessDBMigration:
         else:
             self.dbFile = db_file
         self.pzDb = PzDatabase(self.dbFile)
+        self.db = PzMysqlDatabase(cfg.mysql)
 
-    # def get_table_structure(db_file):
-    #
-    #     self.pzDb.
-    #     conn = pyodbc.connect(conn_str)
-    #     cursor = conn.cursor()
-    #
-    #     # Get table names
-    #     cursor.execute("SELECT name FROM MSysObjects WHERE Type In (1, 4, 6)")
-    #     tables = [row[0] for row in cursor.fetchall()]
-    #
-    #     # Get column information for each table
-    #     for table in tables:
-    #         print(f"Table: {table}")
-    #         cursor.execute(f"SELECT TOP 1 * FROM {table}")
-    #         columns = [column[0] for column in cursor.description]
-    #         print(columns)
-    #
-    #     cursor.close()
-    #     conn.close()
+    def insert_into_basic(self, entities: list[MysqlMemberBasicEntity]):
+        columns = [f'`{k}`' for k in MysqlMemberBasicEntity.PZ_MYSQL_COLUMN_NAMES.values()]
+        columns.insert(0, '`id`')
+        columns_insert = ','.join(columns)
 
-    def migrate(self):
+        values_insert = ','.join(['%s'] * len(columns))
+        query = f'INSERT INTO `{MysqlMemberBasicEntity.TABLE_NAME}` ({columns_insert}) VALUES ({values_insert})'
+
+        params = []
+        for entity in entities:
+            param = [entity.id]
+            for k in MysqlMemberBasicEntity.PZ_MYSQL_COLUMN_NAMES.values():
+                param.append(entity.__dict__[k])
+            params.append(tuple(param))
+
+        supplier = (lambda y=x: x for x in params)
+        self.db.prepared_update(query, supplier)
+
+    def insert_into_more_basic(self, entities: list[MysqlMemberMoreBasicEntity]):
+        columns = ["`id`", "`additional`"]
+        columns_insert = ','.join(columns)
+
+        values_insert = ','.join(['%s'] * len(columns))
+        query = f'INSERT INTO `{MysqlMemberMoreBasicEntity.TABLE_NAME}` ({columns_insert}) VALUES ({values_insert})'
+
+        params = []
+        for entity in entities:
+            params.append((entity.id, json.dumps(entity.additional,
+                                                 default=lambda o: o.to_dict(),
+                                                 sort_keys=True, ensure_ascii=False)))
+
+        supplier = (lambda y=x: x for x in params)
+        self.db.prepared_update(query, supplier)
+
+    def migrate(self) -> int:
         # self.pzDb.get_all_tables()
         # self.pzDb.table_structure('MemberBasic')
 
@@ -71,6 +90,9 @@ class AccessDBMigration:
             else:
                 more_attributes.append((header, i))
 
+        basic_entities = []
+        more_entities = []
+
         for row in rows:
             params: dict[str, str] = {}
             more_params: dict[str, str] = {}
@@ -87,5 +109,13 @@ class AccessDBMigration:
             if basic_entity.id != -1:
                 more_entity = MysqlMemberMoreBasicEntity(basic_entity.id, more_params)
 
-                print(basic_entity.to_json())
-                print(more_entity.to_json())
+                basic_entities.append(basic_entity)
+                more_entities.append(more_entity)
+                # print(basic_entity.to_json())
+                # print(more_entity.to_json())
+
+        self.insert_into_basic(basic_entities)
+        self.insert_into_more_basic(more_entities)
+
+        logger.info(f'>>> {len(basic_entities)} 筆資料匯入')
+        return len(basic_entities)

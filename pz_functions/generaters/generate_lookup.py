@@ -52,6 +52,8 @@ class VLookUpGenerator:
         logger.debug(f'Student ID Index: {self.studentIdIndex}')
         logger.debug(f'Real Name Index: {self.realNameIndex}')
         logger.debug(f'Dharma Name Index: {self.dharmaNameIndex}')
+        logger.debug(self.service.headers)
+        logger.debug(self.dataIndexes)
 
     def perform_action(self, accumulate: list[list[str]], r: int, cells: list[Cell]) -> None:
         student_id = None
@@ -70,21 +72,31 @@ class VLookUpGenerator:
         entity_tuple: tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity] | None = None
 
         if student_id:
-            logger.trace(f'lookup by student id: {student_id}')
+            if isinstance(student_id, str) and student_id.isdigit():
+                student_id = int(student_id)
 
-            entity_tuple = self.member_service.find_one_grand_member_by_student_id(student_id)
-            if entity_tuple is None or entity_tuple[1] is None:
-                return 
+            if isinstance(student_id, int):
+                logger.trace(f'lookup by student id: {student_id}')
 
+                entity_tuple = self.member_service.find_one_grand_member_by_student_id(student_id)
+                if entity_tuple is None or entity_tuple[1] is None:
+                    return
+            elif isinstance(student_id, str) and student_id.startswith('='):
+                accumulate.append([f'第 {r} 列', '學員編號是公式, 請複製再貼上值'])
+                return
         elif full_name:
             real_name, split_dharma_name = full_name_to_names(full_name)
             dharma_name = split_dharma_name if dharma_name is None else dharma_name
-            entity_tuple, warnings = self.member_service.find_one_class_member_by_names_with_warning(
-                real_name, dharma_name)
-            if entity_tuple is None or entity_tuple[1] is None:
-                return
-            logger.trace(f'lookup by name: {real_name} {dharma_name}')
-            accumulate.extend([[f'第 {r} 列', w] for w in warnings])
+
+            if real_name.startswith('=') or dharma_name.startswith('='):
+                accumulate.append([f'第 {r} 列', '姓名或法名是公式, 請複製再貼上值'])
+            else:
+                entity_tuple, warnings = self.member_service.find_one_class_member_by_names_with_warning(
+                    real_name, dharma_name)
+                if entity_tuple is None or entity_tuple[1] is None:
+                    return
+                logger.trace(f'lookup by name: {real_name} {dharma_name}')
+                accumulate.extend([[f'第 {r} 列', w] for w in warnings])
 
         if entity_tuple is not None:
             entity = entity_tuple[1]

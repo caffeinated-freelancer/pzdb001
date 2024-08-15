@@ -1,6 +1,7 @@
 from typing import Callable
 
 from .json_class import JSONClass
+from ..utils import simple_phone_number_normalization
 
 
 def mysql_schema_fine_tunner(creation_columns: list[str]):
@@ -183,10 +184,15 @@ class MysqlMemberBasicEntity(JSONClass):
     emergency_contact: str
     emergency_contact_dharma_name: str
     emergency_contact_relationship: str
+    emergency_contact_phone: str
     personal_id: str
     dharma_protection_position: str
-    ct_world_id: str
     family_code: str
+    family_id: str
+    family_code_name: str
+    threefold_refuge: str
+    five_precepts: str
+    bodhisattva_vow: str
 
     additional: dict[str, str]
 
@@ -202,6 +208,10 @@ class MysqlMemberBasicEntity(JSONClass):
             self.id = int(self.student_id)
         else:
             self.id = -1
+
+        self.home_phone = simple_phone_number_normalization(self.home_phone)
+        self.mobile_phone = simple_phone_number_normalization(self.mobile_phone)
+        self.emergency_contact_phone = simple_phone_number_normalization(self.emergency_contact_phone)
 
     # @staticmethod
     # def member_more_basics_creation() -> list[str]:

@@ -13,6 +13,9 @@ class NewClassGroupStatistics(ExcelCreationModelInterface):
         'dharmaName': '法名',
         'gender': '性別',
         'numberOfMembers': '分組人數',
+        'numberOfMale': '男學員人數',
+        'numberOfFemale': '女學員人數',
+        'numberOfClassMembers': '班級人數',
     }
     serialNo: int
     className: str
@@ -21,8 +24,11 @@ class NewClassGroupStatistics(ExcelCreationModelInterface):
     dharmaName: str
     gender: str
     numberOfMembers: int
+    numberOfMale: int
+    numberOfFemale: int
+    numberOfClassMembers: int
 
-    def __init__(self, senior: NewClassSeniorModel):
+    def __init__(self, senior: NewClassSeniorModel, male: int, female: int, total: int) -> None:
         self.serialNo = senior.serialNo
         self.className = senior.className
         self.groupId = senior.groupId
@@ -30,6 +36,9 @@ class NewClassGroupStatistics(ExcelCreationModelInterface):
         self.dharmaName = senior.dharmaName
         self.gender = senior.gender
         self.numberOfMembers = len(senior.members)
+        self.numberOfMale = male
+        self.numberOfFemale = female
+        self.numberOfClassMembers = total
 
     def get_excel_headers(self) -> list[str]:
         return [x for _, x in NewClassGroupStatistics.VARIABLE_MAP.items()]
