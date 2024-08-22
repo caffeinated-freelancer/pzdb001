@@ -1,8 +1,8 @@
-import datetime
 from typing import Any
 
 from pz.config import PzProjectConfig
 from pz.models.member_detail_model import MemberDetailModel
+from pz.utils import get_formatted_datetime
 from services.excel_creation_service import ExcelCreationService
 from services.mysql_import_and_fetching import MySqlImportAndFetchingService
 
@@ -24,9 +24,8 @@ def export_member_details(cfg: PzProjectConfig) -> str:
     supplier = (lambda y=x: x for x in data)
     service.write_data(supplier)
 
-    now = datetime.datetime.now()
-    formatted_date_time = now.strftime("%Y-%m-%d_%H-%M-%S")
+    formatted_date_time = get_formatted_datetime()
 
-    file_name = f'學員基本資料_{formatted_date_time}.xlsx'
+    file_name = f'報到系統用學員資料_{formatted_date_time}.xlsx'
     service.save(f'{cfg.output_folder}/{file_name}')
     return file_name

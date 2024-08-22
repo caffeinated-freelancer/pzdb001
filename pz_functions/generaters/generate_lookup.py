@@ -110,10 +110,18 @@ class VLookUpGenerator:
                             attr = VLookUpModel.TO_MYSQL_CLASS_MEMBER_MAP[k]
                             if attr in entity.__dict__:
                                 cells[i].value = entity.__dict__[attr]
-                        elif detail is not None and k in VLookUpModel.TO_MYSQL_MEMBER_DETAILS_MAP:
-                            attr = VLookUpModel.TO_MYSQL_MEMBER_DETAILS_MAP[k]
-                            if attr in detail.__dict__:
-                                cells[i].value = detail.__dict__[attr]
+                        elif detail is not None:
+                            if k in VLookUpModel.TO_MYSQL_MEMBER_DETAILS_MAP:
+                                attr = VLookUpModel.TO_MYSQL_MEMBER_DETAILS_MAP[k]
+                                if attr in detail.__dict__:
+                                    cells[i].value = detail.__dict__[attr]
+                            elif k in VLookUpModel.TO_MYSQL_MEMBER_WITH_FUNCTION_DETAILS_MAP:
+                                attr, func = VLookUpModel.TO_MYSQL_MEMBER_WITH_FUNCTION_DETAILS_MAP[k]
+                                # print(attr, func)
+                                if attr in detail.__dict__:
+                                    vv = func(detail.__dict__[attr])
+                                    if vv is not None:
+                                        cells[i].value = vv
 
     def lookup(self) -> list[list[str]]:
         warnings: list[list[str]] = []

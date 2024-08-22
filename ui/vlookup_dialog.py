@@ -44,6 +44,8 @@ class VLookUpDialog(QDialog):
 <li>行動電話 : 空白時回填</li>
 <li>住家電話 : 空白時回填</li>
 <li>護法會職稱 : 空白時回填</li>
+<li>生日末四碼 : 空白時回填</li>
+<li>電話末四碼 : 空白時回填</li>
 </ul></li>
 <li>以姓名 vlookup 時, 可在必要時加法名輔助, 加法名輔助的方式有兩種:
 <ul>

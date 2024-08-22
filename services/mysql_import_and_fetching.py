@@ -7,6 +7,7 @@ from loguru import logger
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
 from pz.cloud.spreadsheet_relations_service import PzCloudSpreadsheetRelationsService
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
+from pz.models.class_member_for_checkin import ClassMemberForCheckinModel
 from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.google_class_member import GoogleClassMemberModel
 from pz.models.google_member_relation import GoogleMemberRelation
@@ -116,6 +117,28 @@ class MySqlImportAndFetchingService:
             except Exception as ignored:
                 pass
         self._rename_table(current_table, from_table)
+
+    def _create_the_checkin_class_member_view(self):
+        query = f"""
+        CREATE OR REPLACE VIEW view_class_member_for_checkin AS 
+        SELECT c.student_id,c.real_name,c.dharma_name,c.class_name,c.class_group,c.gender,d.birthday,d.mobile_phone 
+        FROM {self.current_table} c 
+        LEFT JOIN member_details d USING (student_id) ORDER BY class_name,class_group
+        """
+
+        try:
+            self.db.perform_update(query)
+        except Exception as e:
+            logger.warning(e)
+
+    def read_checkin_class_member_view(self) -> list[ClassMemberForCheckinModel]:
+        self._create_the_checkin_class_member_view()
+        cols, results = self.db.query('SELECT * FROM view_class_member_for_checkin')
+        entities = []
+        for result in results:
+            entity = ClassMemberForCheckinModel(cols, result)
+            entities.append(entity)
+        return entities
 
     def google_class_members_to_mysql(self, check_formula: bool = False) -> int:
         settings: PzProjectGoogleSpreadsheetConfig = self.config.google.spreadsheets.get('class_members')

@@ -1,6 +1,24 @@
 import json
+import re
+from typing import Callable
 
 from pz.models.excel_model import ExcelModelInterface
+
+
+def phoneLast4digit(data: str) -> str | None:
+    if data is not None and isinstance(data, str):
+        matched = re.match(r'\d{4}-\d{2}(\d{4})', data)
+        if matched:
+            return matched.group(1)
+    return None
+
+
+def birthLast4digit(data: str) -> str | None:
+    if data is not None and isinstance(data, str):
+        matched = re.match(r'\d{4}-(\d{2})-(\d{2})', data)
+        if matched:
+            return f'{matched.group(1)}{matched.group(2)}'
+    return None
 
 
 class VLookUpModel(ExcelModelInterface):
@@ -18,6 +36,9 @@ class VLookUpModel(ExcelModelInterface):
         # 'personalId': '身分證字號',
         'birthday': '出生日期',
         'dharmaProtectionPosition': '護法會職稱',
+
+        'birthday:last4digit': '生日末四碼',
+        'mobilePhone:last4digit': '電話末四碼',
     }
 
     TO_MYSQL_CLASS_MEMBER_MAP = {
@@ -36,6 +57,11 @@ class VLookUpModel(ExcelModelInterface):
         # 'personalId': 'class_group',
         'birthday': 'birthday',
         'dharmaProtectionPosition': 'dharma_protection_position',
+    }
+
+    TO_MYSQL_MEMBER_WITH_FUNCTION_DETAILS_MAP: dict[str, tuple[str, Callable]] = {
+        'mobilePhone:last4digit': ('mobile_phone', lambda x: phoneLast4digit(x)),
+        'birthday:last4digit': ('birthday', lambda x: birthLast4digit(x)),
     }
 
     studentId: str | None
