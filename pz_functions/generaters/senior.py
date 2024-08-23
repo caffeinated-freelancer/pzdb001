@@ -526,13 +526,16 @@ def generate_senior_reports(cfg: PzProjectConfig,
         files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
 
         for filename in files:
-            err = generator.processing_senior_report(filename, from_excel=from_excel,
-                                                     from_scratch=from_scratch, no_fix_senior=no_fix_senior,
-                                                     with_table_b=with_table_b)
-            generator.generate_new_class_lineup(filename)
-            generator.generate_class_groups_statistics(filename)
-            errors.extend(err)
-            return errors
+            try:
+                err = generator.processing_senior_report(filename, from_excel=from_excel,
+                                                         from_scratch=from_scratch, no_fix_senior=no_fix_senior,
+                                                         with_table_b=with_table_b)
+                generator.generate_new_class_lineup(filename)
+                generator.generate_class_groups_statistics(filename)
+                errors.extend(err)
+                return errors
+            except Exception as e:
+                logger.warning(f'{filename} - {e}')
     else:
         err = generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_excel=from_excel,
                                                  from_scratch=from_scratch, no_fix_senior=no_fix_senior,

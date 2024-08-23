@@ -195,6 +195,9 @@ def generate_introducer_reports(cfg: PzProjectConfig):
         files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
 
         for filename in files:
-            generate_introducer_report(member_service, cfg, filename)
+            try:
+                generate_introducer_report(member_service, cfg, filename)
+            except Exception as e:
+                logger.warning(f'{filename} - {e}')
     else:
         generate_introducer_report(member_service, cfg, cfg.excel.questionnaire.spreadsheet_file)

@@ -1,8 +1,6 @@
-import datetime
 import glob
 import os
 import re
-import time
 
 from loguru import logger
 
@@ -68,7 +66,10 @@ def member_details_update(cfg: PzProjectConfig) -> bool:
     all_files: list[ExcelUpdateFile] = []
 
     for filename in files:
-        all_files.append(ExcelUpdateFile(filename))
+        try:
+            all_files.append(ExcelUpdateFile(filename))
+        except Exception as e:
+            logger.warning(f'{filename} - {e}')
 
     ordered_files = [x for x in sorted(all_files, key=lambda x: x.basename)]
     logger.trace([x.basename for x in ordered_files])
