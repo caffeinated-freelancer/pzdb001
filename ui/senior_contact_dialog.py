@@ -17,6 +17,8 @@ class SeniorContactDialog(QDialog):
     # fix_senior_checkbox_value: bool = False
     senior_checkbox: QCheckBox
     with_b_checkbox: QCheckBox
+    with_q_checkbox: QCheckBox
+    with_w_checkbox: QCheckBox
 
     def __init__(self, cfg: PzProjectConfig):
         self.config = cfg
@@ -39,6 +41,12 @@ class SeniorContactDialog(QDialog):
         self.with_b_checkbox = QCheckBox("產出 A 表時, 參考 B 表")
         self.with_b_checkbox.setFont(self.uiCommons.font12)
         self.with_b_checkbox.setChecked(False)
+        self.with_q_checkbox = QCheckBox("讀取意願調查表")
+        self.with_q_checkbox.setFont(self.uiCommons.font12)
+        self.with_q_checkbox.setChecked(True)
+        self.with_w_checkbox = QCheckBox("讀取升班調查表")
+        self.with_w_checkbox.setFont(self.uiCommons.font12)
+        self.with_w_checkbox.setChecked(True)
         # senior_checkbox.stateChanged.connect(self.senior_checkbox_state_changed)
         # self.fix_senior_checkbox_value = senior_checkbox.isChecked()
 
@@ -46,6 +54,8 @@ class SeniorContactDialog(QDialog):
             [(f'Google {self.config.semester} 學員同步', self.google_to_mysql)],
             [self.senior_checkbox],
             [self.with_b_checkbox],
+            [self.with_q_checkbox],
+            [self.with_w_checkbox],
             [('讀取 Google 上的升班調查', self.run_senior_report_from_google)],
             [('讀取升班調查 Excel 檔', self.run_senior_report_from_excel)],
             [label],
@@ -81,13 +91,17 @@ class SeniorContactDialog(QDialog):
         self.seniorReportCommon.run_senior_report_from_scratch(
             True, from_excel=False, close_widget=True,
             no_fix_senior=self.senior_checkbox.isChecked(),
-            with_table_b=self.with_b_checkbox.isChecked())
+            with_table_b=self.with_b_checkbox.isChecked(),
+            with_questionnaire=self.with_q_checkbox.isChecked(),
+            with_willingness=self.with_w_checkbox.isChecked())
 
     def run_senior_report_from_excel(self):
         self.seniorReportCommon.run_senior_report_from_scratch(
             True, from_excel=True, close_widget=True,
             no_fix_senior=self.senior_checkbox.isChecked(),
-            with_table_b=self.with_b_checkbox.isChecked())
+            with_table_b=self.with_b_checkbox.isChecked(),
+            with_questionnaire=self.with_q_checkbox.isChecked(),
+            with_willingness=self.with_w_checkbox.isChecked())
 
     # def show_error_dialog(self, e: Exception):
     #     message_box = QMessageBox(self)  # Set parent for proper positioning

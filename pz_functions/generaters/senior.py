@@ -98,45 +98,53 @@ class SeniorReportGenerator:
     def _auto_assignment(self,
                          spreadsheet_file: str, from_excel: bool = False,
                          no_fix_senior: bool = False,
-                         with_table_b: bool = False) -> list[GeneralProcessingError]:
+                         with_table_b: bool = False,
+                         with_questionnaire: bool = True,
+                         with_willingness: bool = True) -> list[GeneralProcessingError]:
         errors: list[GeneralProcessingError] = []
 
-        # 預先處理, 記載每個學員的升班意願
-        # 這裡不會把學員排進班級, 只是記載學員們的升班意願供後續查詢使用。
-        err = self.signup_next_service.pre_processing(from_excel=from_excel)
-        errors.extend(err)
+        if with_willingness:
+            # 預先處理, 記載每個學員的升班意願
+            # 這裡不會把學員排進班級, 只是記載學員們的升班意願供後續查詢使用。
+            err = self.signup_next_service.pre_processing(from_excel=from_excel)
+            errors.extend(err)
 
-        if not no_fix_senior:
-            # 調整學長填寫升班意願的位置
-            self.signup_next_service.fix_senior_willingness()
+            if not no_fix_senior:
+                # 調整學長填寫升班意願的位置
+                self.signup_next_service.fix_senior_willingness()
 
-        # 預先處理禪修班意願調查表, 包括讀取及連結介紹人的部份
-        err, questionnaires_entries = self.questionnaire_service.pre_processing(spreadsheet_file)
-        errors.extend(err)
+        if with_questionnaire:
+            # 預先處理禪修班意願調查表, 包括讀取及連結介紹人的部份
+            err, questionnaires_entries = self.questionnaire_service.pre_processing(spreadsheet_file)
+            errors.extend(err)
 
         if with_table_b:
             # 要參考 B 表的話得先把 B 表讀進來, 排好編班
             self._read_predefined_information(with_table_b=True, questionnaires_entries=questionnaires_entries)
 
-        # 這部份會有部份滿足編組條件的學員先做分組處理
-        # err = self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=True, with_table_b=with_table_b)
-        err = self.questionnaire_service.pre_processing_non_member_classmate()
-        errors.extend(err)
+        if with_questionnaire:
+            # 這部份會有部份滿足編組條件的學員先做分組處理
+            # err = self.questionnaire_service.pre_processing(spreadsheet_file, from_scratch=True, with_table_b=with_table_b)
+            err = self.questionnaire_service.pre_processing_non_member_classmate()
+            errors.extend(err)
 
-        err = self.questionnaire_service.pre_processing_assignment(with_table_b=with_table_b)
-        errors.extend(err)
+            err = self.questionnaire_service.pre_processing_assignment(with_table_b=with_table_b)
+            errors.extend(err)
 
         # 部部份要檢查介紹人關係鏈或誰與誰同組的問題
         self.new_senior_service.perform_follower_loop_first()
 
-        # 處理所有升班調查的部份
-        self.signup_next_service.processing_signups()
+        if with_willingness:
+            # 處理所有升班調查的部份
+            self.signup_next_service.processing_signups()
 
-        # 處理所有意願調查的部份
-        self.questionnaire_service.assign_having_senior_questionnaire()
-        # self.assign_having_senior_questionnaire(spreadsheet_file)
+        if with_questionnaire:
+            # 處理所有意願調查的部份
+            self.questionnaire_service.assign_having_senior_questionnaire()
+            # self.assign_having_senior_questionnaire(spreadsheet_file)
 
-        self.signup_next_service.add_to_pending_groups()
+        if with_willingness:
+            self.signup_next_service.add_to_pending_groups()
 
         self.new_senior_service.adding_unregistered_follower_chain()
 
@@ -285,13 +293,17 @@ class SeniorReportGenerator:
 
     def processing_senior_report(self, spreadsheet_file: str,
                                  from_excel: bool = False, from_scratch: bool = True, no_fix_senior: bool = False,
-                                 with_table_b: bool = False) -> list[GeneralProcessingError]:
+                                 with_table_b: bool = False,
+                                 with_questionnaire: bool = True,
+                                 with_willingness: bool = True) -> list[GeneralProcessingError]:
 
         errors: list[GeneralProcessingError] = []
 
         if from_scratch:
             err = self._auto_assignment(spreadsheet_file, from_excel=from_excel, no_fix_senior=no_fix_senior,
-                                        with_table_b=with_table_b)
+                                        with_table_b=with_table_b,
+                                        with_questionnaire=with_questionnaire,
+                                        with_willingness=with_willingness)
             errors.extend(err)
         else:
             self._perform_final_report_processing(spreadsheet_file)
@@ -512,7 +524,9 @@ class SeniorReportGenerator:
 def generate_senior_reports(cfg: PzProjectConfig,
                             from_scratch: bool, from_excel: bool | None = None,
                             no_fix_senior: bool = False,
-                            with_table_b: bool = False) -> list[GeneralProcessingError]:
+                            with_table_b: bool = False,
+                            with_questionnaire: bool = True,
+                            with_willingness: bool = True) -> list[GeneralProcessingError]:
     if not from_scratch:
         if not os.path.exists(cfg.excel.new_class_predefined_info.spreadsheet_file):
             from_scratch = True
@@ -529,7 +543,9 @@ def generate_senior_reports(cfg: PzProjectConfig,
             try:
                 err = generator.processing_senior_report(filename, from_excel=from_excel,
                                                          from_scratch=from_scratch, no_fix_senior=no_fix_senior,
-                                                         with_table_b=with_table_b)
+                                                         with_table_b=with_table_b,
+                                                         with_questionnaire=with_questionnaire,
+                                                         with_willingness=with_willingness)
                 generator.generate_new_class_lineup(filename)
                 generator.generate_class_groups_statistics(filename)
                 errors.extend(err)
@@ -539,7 +555,9 @@ def generate_senior_reports(cfg: PzProjectConfig,
     else:
         err = generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_excel=from_excel,
                                                  from_scratch=from_scratch, no_fix_senior=no_fix_senior,
-                                                 with_table_b=with_table_b)
+                                                 with_table_b=with_table_b,
+                                                 with_questionnaire=with_questionnaire,
+                                                 with_willingness=with_willingness)
         generator.generate_new_class_lineup(cfg.excel.questionnaire.spreadsheet_file)
         generator.generate_class_groups_statistics(cfg.excel.questionnaire.spreadsheet_file)
         errors.extend(err)

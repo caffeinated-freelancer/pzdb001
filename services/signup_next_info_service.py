@@ -96,6 +96,12 @@ class SignupNextInfoService:
         return entries
 
     def pre_processing(self, from_excel: bool = False, for_table_b: bool = False) -> list[GeneralProcessingError]:
+        """
+        讀取昇班調查, 主要目的在記載學員的昇班意願, 而不在處理分班分組。
+        :param from_excel: 資料讀取自 Excel 而不是 Google 上的昇班調查
+        :param for_table_b: Table B 是有預設分組的表。
+        :return: 錯誤清單
+        """
         errors: list[GeneralProcessingError] = []
 
         if from_excel:

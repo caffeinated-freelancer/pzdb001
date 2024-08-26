@@ -38,6 +38,8 @@ class MysqlMemberBasicEntity(JSONClass):
         # '受五戒日期': 'five_precepts_date',
         '是否受菩薩戒': 'bodhisattva_vow',
         # '受菩薩戒日期': 'bodhisattva_vow_date',
+        '新制最高禪修班別(學佛經歷)': 'highest_meditation_class',
+        '舊制最高禪修班別': 'highest_meditation_old_class',
     }
     CT_WORLD_FIELD_NAME_MAP: dict[str, str] = {
         'student_id': '學員編號',
@@ -75,8 +77,8 @@ class MysqlMemberBasicEntity(JSONClass):
         'field33': '本山發心',
         'field34': '親眷發心稱謂',
         'family_code': '家屬碼',
-        'field36': '新制最高禪修班別(學佛經歷)',
-        'field37': '舊制最高禪修班別',
+        'highest_meditation_class': '新制最高禪修班別(學佛經歷)',
+        'highest_meditation_old_class': '舊制最高禪修班別',
         'field38': '通訊(郵遞區號)',
         'field39': '通訊(國家)',
         'field40': '通訊(縣市)',
