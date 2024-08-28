@@ -21,6 +21,8 @@ class PzProjectBaseConfig:
                     self.__setattr__(variable, value)
             elif isinstance(value, int):
                 self.__setattr__(variable, value)
+            elif isinstance(value, list):
+                self.__setattr__(variable, value)
             elif isinstance(value, dict):
                 if sub_initializer is None or not sub_initializer(variable, value):
                     self.__setattr__(variable, value)
@@ -212,6 +214,7 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
 
 class PzProjectConfig(PzProjectBaseConfig):
     config_filename: str
+    version: str
     workspace: str
     template_folder: str
     output_folder: str
@@ -223,6 +226,7 @@ class PzProjectConfig(PzProjectBaseConfig):
     previous_semester: str
     debug_text_file_output: str
     logging: PzProjectLoggingConfig
+    meditation_class_names: list[str]
 
     def __init__(self, filename: str, variables: dict[str, Any]) -> None:
         self.config_filename = filename
@@ -254,6 +258,7 @@ class PzProjectConfig(PzProjectBaseConfig):
         #     variables.pop('debug_text_file_output')
 
         PzProjectConfigGlobal.config = self
+        self.meditation_class_names = []
         super().__init__(variables, self.variable_initializer)
 
     def variable_initializer(self, variable: str, value: Any) -> bool:

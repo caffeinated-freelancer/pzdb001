@@ -1,5 +1,6 @@
 import enum
 import glob
+import os
 import re
 from enum import Enum
 from typing import Any
@@ -141,56 +142,58 @@ def generate_member_comparison_table(cfg: PzProjectConfig) -> tuple[
     difference_records: list[DifferenceRecord] = []
 
     for filename in files:
-        matched = re.match(r'^(.*)_(.{2}).?_上課.*', filename)
+        f = os.path.basename(filename)
+        if not f.startswith("~$"):
+            matched = re.match(r'^(.*)_(.{2}).?_上課.*', filename)
 
-        if matched:
-            class_name = matched.group(2)
-            if class_name in processed_classes:
-                logger.warning(f'{class_name} 已經處理過了')
-                continue
-            processed_classes.add(class_name)
-
-            member_in_class_group: dict[int, dict[int, MysqlClassMemberEntity]] = {}
-            for m in all_class_members:
-                if m.class_name == class_name:
-                    if m.class_group not in member_in_class_group:
-                        member_in_class_group[m.class_group] = {}
-                    member_in_class_group[m.class_group][m.student_id] = m
-
-            records_excel = ExcelWorkbookService(AttendRecord({}), filename, None,
-                                                 header_at=spreadsheet_cfg.header_row,
-                                                 ignore_parenthesis=spreadsheet_cfg.ignore_parenthesis,
-                                                 print_header=False,
-                                                 debug=False)
-            row_records: list[AttendRecord] = records_excel.read_all(required_attribute='studentId')
-
-            for record in row_records:
-                if record.realName.startswith('範例-'):
+            if matched:
+                class_name = matched.group(2)
+                if class_name in processed_classes:
+                    logger.warning(f'{class_name} 已經處理過了')
                     continue
-                student_id = int(record.studentId)
-                group_id = int(record.groupName)
+                processed_classes.add(class_name)
 
-                if group_id not in member_in_class_group:
-                    logger.warning(f'Google 資料缺少 {class_name} {group_id} 群組')
-                elif student_id not in member_in_class_group[group_id]:
-                    difference_records.append(DifferenceRecord.not_in_google(class_name, group_id, record))
-                    logger.warning(
-                        f'Google 資料缺少 {class_name} {group_id} {record.realName}/{record.dharmaName}/{record.studentId}')
-                else:
-                    entry = member_in_class_group[group_id][student_id]
+                member_in_class_group: dict[int, dict[int, MysqlClassMemberEntity]] = {}
+                for m in all_class_members:
+                    if m.class_name == class_name:
+                        if m.class_group not in member_in_class_group:
+                            member_in_class_group[m.class_group] = {}
+                        member_in_class_group[m.class_group][m.student_id] = m
 
-                    difference = DifferenceRecord.has_difference(record, entry)
+                records_excel = ExcelWorkbookService(AttendRecord({}), filename, None,
+                                                     header_at=spreadsheet_cfg.header_row,
+                                                     ignore_parenthesis=spreadsheet_cfg.ignore_parenthesis,
+                                                     print_header=False,
+                                                     debug=False)
+                row_records: list[AttendRecord] = records_excel.read_all(required_attribute='studentId')
 
-                    if difference.differentType != DifferenceRecordType.NO_DIFFERENCE:
-                        difference_records.append(difference)
+                for record in row_records:
+                    if record.realName.startswith('範例-'):
+                        continue
+                    student_id = int(record.studentId)
+                    group_id = int(record.groupName)
 
-                    del member_in_class_group[group_id][student_id]
+                    if group_id not in member_in_class_group:
+                        logger.warning(f'Google 資料缺少 {class_name} {group_id} 群組')
+                    elif student_id not in member_in_class_group[group_id]:
+                        difference_records.append(DifferenceRecord.not_in_google(class_name, group_id, record))
+                        logger.warning(
+                            f'Google 資料缺少 {class_name} {group_id} {record.realName}/{record.dharmaName}/{record.studentId}')
+                    else:
+                        entry = member_in_class_group[group_id][student_id]
 
-            for group_id in member_in_class_group:
-                for student_id in member_in_class_group[group_id]:
-                    entry = member_in_class_group[group_id][student_id]
-                    difference_records.append(DifferenceRecord.only_in_google(entry))
-                    logger.warning(f'{class_name}/{group_id}/{student_id}/{entry.real_name} 僅在 Google 學員')
+                        difference = DifferenceRecord.has_difference(record, entry)
+
+                        if difference.differentType != DifferenceRecordType.NO_DIFFERENCE:
+                            difference_records.append(difference)
+
+                        del member_in_class_group[group_id][student_id]
+
+                for group_id in member_in_class_group:
+                    for student_id in member_in_class_group[group_id]:
+                        entry = member_in_class_group[group_id][student_id]
+                        difference_records.append(DifferenceRecord.only_in_google(entry))
+                        logger.warning(f'{class_name}/{group_id}/{student_id}/{entry.real_name} 僅在 Google 學員')
 
     if len(difference_records) > 0:
         model = DifferenceRecord('', 0)

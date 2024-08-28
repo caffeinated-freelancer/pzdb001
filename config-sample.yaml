@@ -1,5 +1,7 @@
 # Pz DB 001
 
+version: 1.0.0
+
 # 資料根目錄
 workspace: '{USERPROFILE}\Desktop\來源資料'
 
@@ -20,6 +22,16 @@ logging:
   level: DEBUG
   log_file: '{OUTPUT_FOLDER}\log-file.txt'
   format: '{time} - {level} - {message}'
+
+meditation_class_names:
+  - "日初"
+  - "夜初"
+  - "日中"
+  - "夜中"
+  - "日高"
+  - "夜高"
+  - "日研"
+  - "夜研"
 
 # MySQL 資料庫連線設定
 mysql:

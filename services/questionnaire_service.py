@@ -242,10 +242,10 @@ class QuestionnaireService:
                                                                               questionnaires_entry.member)
                     if group_id == -1:
                         questionnaires_entries.append(questionnaires_entry)
-                        logger.error(
+                        logger.info(
                             f'{questionnaires_entry.entry.fullName} not assigned')
                     else:
-                        logger.warning(
+                        logger.debug(
                             f'{questionnaires_entry.entry.fullName} already assigned to {questionnaires_entry.entry.registerClass}{group_id}')
         else:
             questionnaires_entries = self.all_questionnaires_entries

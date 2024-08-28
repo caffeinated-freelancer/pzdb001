@@ -1,4 +1,5 @@
 import glob
+import os
 import re
 from typing import Any
 
@@ -268,8 +269,10 @@ def generate_graduation_reports(cfg: PzProjectConfig):
     files = glob.glob(f'{graduation_cfg.records.spreadsheet_folder}/*.xlsx')
 
     for filename in files:
-        try:
-            generate_graduation_report(cfg, standards, graduation_cfg.records, filename)
-        except Exception as e:
-            logger.warning(f'{filename} - {e}')
+        f = os.path.basename(filename)
+        if not f.startswith("~$"):
+            try:
+                generate_graduation_report(cfg, standards, graduation_cfg.records, filename)
+            except Exception as e:
+                logger.warning(f'{filename} - {e}')
         # break

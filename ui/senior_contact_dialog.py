@@ -1,6 +1,6 @@
 import os
 
-from PyQt6.QtWidgets import QDialog, QLabel, QCheckBox
+from PyQt6.QtWidgets import QDialog, QLabel, QCheckBox, QRadioButton, QComboBox
 
 from pz.config import PzProjectConfig
 from ui.dispatch_doc_dialog import DispatchDocDialog
@@ -19,6 +19,7 @@ class SeniorContactDialog(QDialog):
     with_b_checkbox: QCheckBox
     with_q_checkbox: QCheckBox
     with_w_checkbox: QCheckBox
+    willingness_combo: QComboBox
 
     def __init__(self, cfg: PzProjectConfig):
         self.config = cfg
@@ -44,9 +45,24 @@ class SeniorContactDialog(QDialog):
         self.with_q_checkbox = QCheckBox("讀取意願調查表")
         self.with_q_checkbox.setFont(self.uiCommons.font12)
         self.with_q_checkbox.setChecked(True)
-        self.with_w_checkbox = QCheckBox("讀取升班調查表")
-        self.with_w_checkbox.setFont(self.uiCommons.font12)
-        self.with_w_checkbox.setChecked(True)
+
+        self.willingness_combo = QComboBox()
+        self.willingness_combo.addItem("🚫 不要讀取升班調查表")
+        self.willingness_combo.addItem("☁ 讀取 Google 升班調查表")
+        self.willingness_combo.addItem("📊 讀取 Excel 升班調查表")
+        self.willingness_combo.setCurrentIndex(1)
+        self.willingness_combo.setFont(self.uiCommons.font12)
+        self.willingness_combo.setFixedHeight(40)
+
+        # self.with_w_checkbox = QCheckBox("讀取 Google 升班調查表")
+        # self.with_w_checkbox.setFont(self.uiCommons.font12)
+        # self.with_w_checkbox.setChecked(True)
+        # self.with_w_checkbox = QCheckBox("讀取 Excel 升班調查表")
+        # self.with_w_checkbox.setFont(self.uiCommons.font12)
+        # self.with_w_checkbox.setChecked(True)
+
+        # QRadioButton(self.with_wg_checkbox).setChecked(True)
+        # QRadioButton(self.with_wg_checkbox).setChecked(True)
         # senior_checkbox.stateChanged.connect(self.senior_checkbox_state_changed)
         # self.fix_senior_checkbox_value = senior_checkbox.isChecked()
 
@@ -55,9 +71,9 @@ class SeniorContactDialog(QDialog):
             [self.senior_checkbox],
             [self.with_b_checkbox],
             [self.with_q_checkbox],
-            [self.with_w_checkbox],
-            [('讀取 Google 上的升班調查', self.run_senior_report_from_google)],
-            [('讀取升班調查 Excel 檔', self.run_senior_report_from_excel)],
+            [self.willingness_combo],
+            # [self.with_w_checkbox],
+            [('進行 A 表及電聯表產生', self.run_senior_report)],
             [label],
             [('自動分班演算法說明', self.show_dispatch_doc)],
         ]
@@ -87,21 +103,41 @@ class SeniorContactDialog(QDialog):
     #         self.uiCommons.show_error_dialog(e)
     #         logger.error(e)
 
-    def run_senior_report_from_google(self):
-        self.seniorReportCommon.run_senior_report_from_scratch(
-            True, from_excel=False, close_widget=True,
-            no_fix_senior=self.senior_checkbox.isChecked(),
-            with_table_b=self.with_b_checkbox.isChecked(),
-            with_questionnaire=self.with_q_checkbox.isChecked(),
-            with_willingness=self.with_w_checkbox.isChecked())
+    # def run_senior_report_from_google(self):
+    #     self.seniorReportCommon.run_senior_report_from_scratch(
+    #         True, from_excel=False, close_widget=True,
+    #         no_fix_senior=self.senior_checkbox.isChecked(),
+    #         with_table_b=self.with_b_checkbox.isChecked(),
+    #         with_questionnaire=self.with_q_checkbox.isChecked(),
+    #         with_willingness=self.with_w_checkbox.isChecked())
 
-    def run_senior_report_from_excel(self):
+    def run_senior_report(self):
+        current_index = self.willingness_combo.currentIndex()
+
+        if current_index == 1:
+            willingness = True
+            from_excel = False
+        elif current_index == 2:
+            willingness = True
+            from_excel = True
+        else:
+            willingness = False
+            from_excel = False
+
         self.seniorReportCommon.run_senior_report_from_scratch(
-            True, from_excel=True, close_widget=True,
+            True, from_excel=from_excel, close_widget=True,
             no_fix_senior=self.senior_checkbox.isChecked(),
             with_table_b=self.with_b_checkbox.isChecked(),
             with_questionnaire=self.with_q_checkbox.isChecked(),
-            with_willingness=self.with_w_checkbox.isChecked())
+            with_willingness=willingness)
+
+    # def run_senior_report_from_excel(self):
+    #     self.seniorReportCommon.run_senior_report_from_scratch(
+    #         True, from_excel=True, close_widget=True,
+    #         no_fix_senior=self.senior_checkbox.isChecked(),
+    #         with_table_b=self.with_b_checkbox.isChecked(),
+    #         with_questionnaire=self.with_q_checkbox.isChecked(),
+    #         with_willingness=self.with_w_checkbox.isChecked())
 
     # def show_error_dialog(self, e: Exception):
     #     message_box = QMessageBox(self)  # Set parent for proper positioning

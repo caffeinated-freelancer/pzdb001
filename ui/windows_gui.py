@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QAction
@@ -243,6 +244,21 @@ class PyPzWindows(QMainWindow):
         #     content = file.read()
         #     webbrowser.open('data:text/plain;charset=utf-8,' + content)
 
+    def re_read_settings(self):
+        v0 = self.config.version
+        self.config = PzProjectConfig.from_yaml(self.config.config_filename)
+        logger.info(f'Configur file version {self.config.version} (from: {v0})')
+        logger.trace(self.config)
+
+        logger.configure(
+            handlers=[{"sink": sys.stderr, "level": self.config.logging.level}],
+            # Change 'WARNING' to your desired level
+        )
+        logger.add(self.config.logging.log_file, level=self.config.logging.level, format=self.config.logging.format)
+
+        # self.uiCommons.show_message_dialog('重新讀取設定檔', '設定檔重新讀取完成, 新的設定已生效。')
+        self.uiCommons.show_message_dialog('重新讀取設定檔', '此功能尚在測試階段')
+
     def member_info_export(self):
         try:
             filename = export_member_details(self.config)
@@ -372,11 +388,12 @@ class PyPzWindows(QMainWindow):
                 ('💾 MS Access 資料庫🔸', self.handle_ms_access),
                 # FIXME
                 # (f'🔄 Google 親眷朋友關係同步', self.google_relations_to_mysql),
+                ('🌀 報到系統輔助🔸', self.open_checkin_system),
                 # ('🌀 報到系統輔助🔸', self.open_checkin_system),
             ],
             [
                 ('📖 開啟程式設定檔', self.open_settings_in_notepad),
-                ('🌀 報到系統輔助🔸', self.open_checkin_system),
+                ('📤 重新載入程式設定檔', self.re_read_settings),
                 ('🔧設計師的工具小品🔸', self.open_toolbox),
             ]
             # [('開課前電聯表', self.do_nothing), ],

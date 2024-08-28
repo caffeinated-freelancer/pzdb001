@@ -353,6 +353,11 @@ class SeniorReportGenerator:
                 latest_class, latest_senior = entry.lastSenior.split('/', 2)
 
             if entry.studentId is not None:
+                if isinstance(entry.studentId, str):
+                    entry.studentId = int(entry.studentId)
+                if isinstance(entry.groupId, str):
+                    entry.groupId = int(entry.groupId)
+                # print(f'{entry.studentId} {isinstance(entry.studentId, str)} {isinstance(entry.studentId, int)}')
                 signup_entry = self.signup_next_service.find_by_student_id_for_table_b(entry.studentId)
 
                 if signup_entry is None:
@@ -540,18 +545,21 @@ def generate_senior_reports(cfg: PzProjectConfig,
         files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
 
         for filename in files:
-            try:
-                err = generator.processing_senior_report(filename, from_excel=from_excel,
-                                                         from_scratch=from_scratch, no_fix_senior=no_fix_senior,
-                                                         with_table_b=with_table_b,
-                                                         with_questionnaire=with_questionnaire,
-                                                         with_willingness=with_willingness)
-                generator.generate_new_class_lineup(filename)
-                generator.generate_class_groups_statistics(filename)
-                errors.extend(err)
-                return errors
-            except Exception as e:
-                logger.warning(f'{filename} - {e}')
+            f = os.path.basename(filename)
+            if not f.startswith("~$"):
+                try:
+                    err = generator.processing_senior_report(filename, from_excel=from_excel,
+                                                             from_scratch=from_scratch, no_fix_senior=no_fix_senior,
+                                                             with_table_b=with_table_b,
+                                                             with_questionnaire=with_questionnaire,
+                                                             with_willingness=with_willingness)
+                    generator.generate_new_class_lineup(filename)
+                    generator.generate_class_groups_statistics(filename)
+                    errors.extend(err)
+                    return errors
+                except Exception as e:
+                    logger.error(f'{filename} - {e}')
+                    raise e
     else:
         err = generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_excel=from_excel,
                                                  from_scratch=from_scratch, no_fix_senior=no_fix_senior,
