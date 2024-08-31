@@ -186,6 +186,7 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
     signup_next_info: PzProjectExcelSpreadsheetConfig
     new_class_predefined_info: PzProjectExcelSpreadsheetConfig
     member_details_update: PzProjectExcelSpreadsheetConfig
+    post_lineup_template_folder: str
 
     def __init__(self, variables: dict[str, Any]) -> None:
         self.templates = {}

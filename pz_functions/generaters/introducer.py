@@ -135,8 +135,8 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
             '連絡電話': "\n".join(phones),
             '報名班別': entry.registerClass if have_register_class else '',
             '說明事項': entry.remark,
-            '讀經班家長/關係': entry.parents if entry.parents is not None and have_register_class and
-                                                entry.registerClass.startswith('兒童') else '',
+            '讀經班家長/關係': entry.parents if entry.parents is not None and have_register_class and entry.registerClass.startswith(
+                '兒童') else '',
             '茶會/上午': 'V' if entry.tee == '上午' else '',
             '茶會/晚上': 'V' if entry.tee == '晚上' else '',
             '喫茶趣': entry.chaForTea if entry.chaForTea is not None else '',

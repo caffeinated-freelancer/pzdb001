@@ -2,7 +2,6 @@ import os
 import subprocess
 import sys
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QAction
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -19,6 +18,8 @@ from pz_functions.generaters.member_comparison import generate_member_comparison
 from pz_functions.importers.mysql_functions import write_google_relation_to_mysql
 from ui.access_db_dialog import AccessDatabaseDialog
 from ui.checkin_system_dialog import CheckinSystemDialog
+from ui.cloud_upload_dialog import CloudUploadDialog
+from ui.config_holder import ConfigHolder
 from ui.member_import_dialog import MemberImportDialog
 from ui.pilgrimage_dialog import PilgrimageDialog
 from ui.processing_done_dialog import ProcessingDoneDialog
@@ -36,7 +37,7 @@ BUTTON_SIZE = 120
 
 
 class PyPzWindows(QMainWindow):
-    config: PzProjectConfig
+    configHolder: ConfigHolder
     # dispatchDocDialog: DispatchDocDialog
     seniorContactDialog: SeniorContactDialog
     memberImportDialog: MemberImportDialog
@@ -50,11 +51,12 @@ class PyPzWindows(QMainWindow):
     seniorReportCommon: SeniorReportCommon
     pzCentralLayout: QVBoxLayout
     pzCentralWidget: QWidget
+    cloudUploadDialog: CloudUploadDialog
 
     def __init__(self, cfg: PzProjectConfig):
         super().__init__()
-        self.config = cfg
-        self.uiCommons = PzUiCommons(self, self.config)
+        self.configHolder = ConfigHolder(cfg)
+        self.uiCommons = PzUiCommons(self, self.configHolder)
         self.setWindowTitle(f'普中資料管理程式 v{__pz_version__}')
         self.default_font = self.uiCommons.font14
         self.setFixedSize(880, 520)
@@ -75,16 +77,17 @@ class PyPzWindows(QMainWindow):
         # self.create_full_function_buttons()
         # self.create_simple_function_buttons()
         # self.dispatchDocDialog = DispatchDocDialog()
-        self.seniorContactDialog = SeniorContactDialog(cfg)
-        self.show()
-        self.activateWindow()
-        self.memberImportDialog = MemberImportDialog(cfg)
-        self.vLookUpDialog = VLookUpDialog(cfg)
-        self.accessDatabaseDialog = AccessDatabaseDialog(cfg)
-        self.toolboxDialog = ToolboxDialog(cfg)
-        self.checkinSystemDialog = CheckinSystemDialog(cfg)
-        self.pilgrimageDialog = PilgrimageDialog(cfg)
-        self.seniorReportCommon = SeniorReportCommon(self, self.uiCommons, self.config)
+        # self.seniorContactDialog = SeniorContactDialog(self.configHolder)
+        # self.show()
+        # self.activateWindow()
+        # self.memberImportDialog = MemberImportDialog(cfg)
+        # self.vLookUpDialog = VLookUpDialog(cfg)
+        # self.accessDatabaseDialog = AccessDatabaseDialog(cfg)
+        # self.toolboxDialog = ToolboxDialog(cfg)
+        # self.checkinSystemDialog = CheckinSystemDialog(cfg)
+        # self.pilgrimageDialog = PilgrimageDialog(cfg)
+        # self.seniorReportCommon = SeniorReportCommon(self, self.uiCommons, self.config)
+        self.re_initialize()
 
         # layout = QHBoxLayout()
         # #
@@ -95,6 +98,20 @@ class PyPzWindows(QMainWindow):
         # layout.addWidget(QPushButton("Center"))
         # layout.addWidget(QPushButton("Right"))
         # window.setLayout(layout)
+        # self.show()
+
+    def re_initialize(self):
+        self.seniorContactDialog = SeniorContactDialog(self.configHolder)
+        self.activateWindow()
+        self.memberImportDialog = MemberImportDialog(self.configHolder)
+        self.vLookUpDialog = VLookUpDialog(self.configHolder)
+        self.accessDatabaseDialog = AccessDatabaseDialog(self.configHolder)
+        self.cloudUploadDialog = CloudUploadDialog(self.configHolder)
+        self.toolboxDialog = ToolboxDialog(self.configHolder)
+        self.checkinSystemDialog = CheckinSystemDialog(self.configHolder)
+        self.pilgrimageDialog = PilgrimageDialog(self.configHolder)
+        self.seniorReportCommon = SeniorReportCommon(self, self.uiCommons, self.configHolder)
+        self.show()
 
     def create_menu(self):
         menubar = self.menuBar()
@@ -116,14 +133,14 @@ class PyPzWindows(QMainWindow):
         file_menu.addAction(exit_action)
 
     def do_nothing(self):
-        os.startfile(self.config.output_folder)
+        os.startfile(self.configHolder.get_config().output_folder)
 
     def open_folder(self):
-        os.startfile(self.config.output_folder)
+        os.startfile(self.configHolder.get_config().output_folder)
 
     def run_generate_graduation_reports(self):
         try:
-            generate_graduation_reports(self.config)
+            generate_graduation_reports(self.configHolder.get_config())
             # os.startfile(self.config.output_folder)
             self.uiCommons.done()
         except Exception as e:
@@ -131,9 +148,9 @@ class PyPzWindows(QMainWindow):
 
     def run_introducer_report(self):
         try:
-            self.config.make_sure_output_folder_exists()
-            self.config.explorer_output_folder()
-            generate_introducer_reports(self.config)
+            self.configHolder.get_config().make_sure_output_folder_exists()
+            self.configHolder.get_config().explorer_output_folder()
+            generate_introducer_reports(self.configHolder.get_config())
             self.uiCommons.done()
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
@@ -184,20 +201,20 @@ class PyPzWindows(QMainWindow):
     #     self.dispatchDocDialog.exec()
 
     def open_graduation_folder(self):
-        explorer_folder(self.config.excel.graduation.records.spreadsheet_folder)
+        explorer_folder(self.configHolder.get_config().excel.graduation.records.spreadsheet_folder)
 
     def open_questionnaire_folder(self):
-        explorer_folder(self.config.excel.questionnaire.spreadsheet_folder)
+        explorer_folder(self.configHolder.get_config().excel.questionnaire.spreadsheet_folder)
 
     def open_senior_folder(self):
-        explorer_folder(os.path.dirname(self.config.excel.new_class_senior.spreadsheet_file))
+        explorer_folder(os.path.dirname(self.configHolder.get_config().excel.new_class_senior.spreadsheet_file))
 
     def open_template_folder(self):
-        explorer_folder(self.config.template_folder)
+        explorer_folder(self.configHolder.get_config().template_folder)
 
     def open_output_folder(self):
-        self.config.make_sure_output_folder_exists()
-        explorer_folder(self.config.output_folder)
+        self.configHolder.get_config().make_sure_output_folder_exists()
+        explorer_folder(self.configHolder.get_config().output_folder)
 
     # def access_to_mysql(self):
     #     try:
@@ -209,6 +226,9 @@ class PyPzWindows(QMainWindow):
     def handle_ms_access(self):
         self.accessDatabaseDialog.exec()
 
+    def handle_cloud_upload(self):
+        self.cloudUploadDialog.exec()
+
     def google_to_mysql(self):
         self.uiCommons.google_to_mysql()
         # try:
@@ -219,14 +239,14 @@ class PyPzWindows(QMainWindow):
 
     def google_relations_to_mysql(self):
         try:
-            records, errors = write_google_relation_to_mysql(self.config)
+            records, errors = write_google_relation_to_mysql(self.configHolder.get_config())
             label = QLabel()
             label.setFont(self.uiCommons.font14)
             label.setText(f'{records} 筆親眷朋友關係資料匯入')
 
             if len(errors) > 0:
                 dialog = ProcessingDoneDialog(
-                    self.config, '完親眷朋友關係匯到資料庫', ['等級', '警告訊息'], [
+                    self.configHolder, '完親眷朋友關係匯到資料庫', ['等級', '警告訊息'], [
                         [x.level_name(), x.message] for x in errors
                     ], [[label]])
                 dialog.exec()
@@ -239,29 +259,32 @@ class PyPzWindows(QMainWindow):
 
     def open_settings_in_notepad(self):
         # Open the file content (might launch in browser on some systems)
-        subprocess.run(["notepad.exe", self.config.config_filename])
+        subprocess.run(["notepad.exe", self.configHolder.get_config().config_filename])
         # with open(self.config.config_filename, 'r') as file:
         #     content = file.read()
         #     webbrowser.open('data:text/plain;charset=utf-8,' + content)
 
     def re_read_settings(self):
-        v0 = self.config.version
-        self.config = PzProjectConfig.from_yaml(self.config.config_filename)
-        logger.info(f'Configur file version {self.config.version} (from: {v0})')
-        logger.trace(self.config)
+        v0 = self.configHolder.get_config().version
+        config = PzProjectConfig.from_yaml(self.configHolder.get_config().config_filename)
+        self.configHolder.set_config(config)
+        logger.info(f'Configure file version {config.version} (from: {v0})')
+        logger.trace(self.configHolder.get_config())
 
         logger.configure(
-            handlers=[{"sink": sys.stderr, "level": self.config.logging.level}],
+            handlers=[{"sink": sys.stderr, "level": config.logging.level}],
             # Change 'WARNING' to your desired level
         )
-        logger.add(self.config.logging.log_file, level=self.config.logging.level, format=self.config.logging.format)
+        logger.add(config.logging.log_file, level=config.logging.level, format=config.logging.format)
 
         # self.uiCommons.show_message_dialog('重新讀取設定檔', '設定檔重新讀取完成, 新的設定已生效。')
-        self.uiCommons.show_message_dialog('重新讀取設定檔', '此功能尚在測試階段')
+        self.uiCommons.show_message_dialog(
+            '重新讀取設定檔',
+            f'<p>設定檔讀取完成, 設定檔版本 {config.version}。</p><p>注意! 此功能尚在測試階段, 若有任何問題, 請重啟程式。</p>')
 
     def member_info_export(self):
         try:
-            filename = export_member_details(self.config)
+            filename = export_member_details(self.configHolder.get_config())
             self.uiCommons.done()
             self.uiCommons.show_message_dialog('匯出學員基本資料', f'匯出至 {filename}')
         except Exception as e:
@@ -292,7 +315,7 @@ class PyPzWindows(QMainWindow):
 
     def member_difference_comparing(self):
         try:
-            filename, headers, warnings = generate_member_comparison_table(self.config)
+            filename, headers, warnings = generate_member_comparison_table(self.configHolder.get_config())
 
             if filename is None:
                 self.uiCommons.done()
@@ -303,7 +326,7 @@ class PyPzWindows(QMainWindow):
                     button = self.uiCommons.create_a_button(f'開啟差異檔 (Excel 格式)')
                     button.clicked.connect(lambda: os.startfile(filename))
                     dialog = ProcessingDoneDialog(
-                        self.config, 'Google 雲端 vs 個資學員資料',
+                        self.configHolder, 'Google 雲端 vs 個資學員資料',
                         headers, warnings, [[button]])
                     dialog.exec()
                 else:
@@ -348,7 +371,7 @@ class PyPzWindows(QMainWindow):
                 ('🔎 姓名 V 班級/組別🔸', self.vlookup_by_name),
             ],
             [
-                (f'🔄 Google {self.config.semester} 學員同步', self.google_to_mysql),
+                (f'🔄 Google {self.configHolder.get_config().semester} 學員同步', self.google_to_mysql),
             ],
             [
                 ('🔼 切換成完整版', self.change_to_full_layout),
@@ -376,7 +399,7 @@ class PyPzWindows(QMainWindow):
             # [('[產出] 學長電聯表(讀 B 表)', self.run_senior_report), ('自動分班演算法說明', self.show_dispatch_doc)],
             [
                 ('📝 學長電聯表(讀 B 表)', self.run_senior_report),
-                (f'🔄 Google {self.config.semester} 學員同步', self.google_to_mysql),
+                (f'🔄 Google {self.configHolder.get_config().semester} 學員同步', self.google_to_mysql),
                 ('🔄 學員基本資料 匯入🔸', self.member_info_import),
             ],
             [
@@ -389,6 +412,7 @@ class PyPzWindows(QMainWindow):
                 # FIXME
                 # (f'🔄 Google 親眷朋友關係同步', self.google_relations_to_mysql),
                 ('🌀 報到系統輔助🔸', self.open_checkin_system),
+                ('🚀 雲端上傳同步🔸', self.handle_cloud_upload),
                 # ('🌀 報到系統輔助🔸', self.open_checkin_system),
             ],
             [
@@ -429,13 +453,13 @@ class PyPzWindows(QMainWindow):
         output_button_layout.addWidget(output_folder_button)
         self.pzCentralLayout.addLayout(output_button_layout)
 
-        members = ['法世', '法和', '法華', '法喜', '傳洵', '傳資']
-
-        announce = QLabel(
-            f'版權說明：本程式於 2024 年由普中精舍見聲法師帶領資料組{"、".join(members)} (按法名筆畫次序) 共同規劃需求；程式開發：劍青。')
-
-        announce.setFont(self.uiCommons.font10)
-        announce.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        announce.setWordWrap(True)
-        announce.setStyleSheet("color: brown;")
-        self.pzCentralLayout.addWidget(announce)
+        # members = ['法世', '法和', '法華', '法喜', '傳洵', '傳資']
+        #
+        # announce = QLabel(
+        #     f'版權說明：本程式於 2024 年由普中精舍見聲法師帶領資料組{"、".join(members)} (按法名筆畫次序) 共同規劃需求；程式開發：劍青。')
+        #
+        # announce.setFont(self.uiCommons.font10)
+        # announce.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        # announce.setWordWrap(True)
+        # announce.setStyleSheet("color: brown;")
+        # self.pzCentralLayout.addWidget(announce)

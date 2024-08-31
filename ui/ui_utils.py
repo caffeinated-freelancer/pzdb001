@@ -7,16 +7,16 @@ from PyQt6.QtWidgets import QLayout, QPushButton, QVBoxLayout, QGridLayout, QTex
 from ui.ui_commons import PzUiCommons
 
 
-class PzUiButton():
+class PzUiButton:
     buttonText: str
     callback: Callable
     font: QFont | None
     buttonWidth: int
     buttonHeight: int
 
-    def __init__(self, buttonText: str, callback: Callable, font: QFont | None = None, button_width: int = 0,
+    def __init__(self, button_text: str, callback: Callable, font: QFont | None = None, button_width: int = 0,
                  button_height: int = 0):
-        self.buttonText = buttonText
+        self.buttonText = button_text
         self.callback = callback
         self.font = font
         self.buttonWidth = button_width

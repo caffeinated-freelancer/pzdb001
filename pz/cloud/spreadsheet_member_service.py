@@ -54,3 +54,23 @@ class PzCloudSpreadsheetMemberService:
                 logger.trace(f'{result}')
                 entries.append(model)
         return entries
+
+    def clear_all(self, model: GoogleSpreadSheetModelInterface):
+        self.service.clear_sheet_data(
+            self.settings.sheet_name, model.get_column_names(),
+            header_row=self.settings.header_row)
+
+    def write_data(self, models: list[GoogleSpreadSheetModelInterface]):
+        if len(models) > 0:
+
+            data = []
+            for model in models:
+                entry = []
+                for column_name in model.get_variable_names():
+                    entry.append(model.__dict__[column_name])
+                data.append(entry)
+
+            self.service.write_data(
+                self.settings.sheet_name, models[0].get_column_names(),
+                data,
+                header_row=self.settings.header_row)

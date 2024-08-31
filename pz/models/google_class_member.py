@@ -11,6 +11,7 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
     SPREADSHEET_TITLE = '03-活動調查(所有學員)'
     VARIABLE_MAP: dict[str, str | list[str]] = {
         'sn': '總序',
+        'groupSn': '序',
         'studentId': '學員編號(公式)',
         'className': '班級',
         'classGroup': '組別',
@@ -24,6 +25,7 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
     # VARIABLE_LOCATIONS = [key for key in VARIABLE_MAP.keys()]
 
     sn: str
+    groupSn: str
     studentId: str
     className: str
     classGroup: str
@@ -109,3 +111,11 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
         #
         # logger.error(columns)
         return columns
+
+    def get_variable_names(self):
+        variables: list[str] = []
+        for k, v in self.VARIABLE_MAP.items():
+            if isinstance(v, str):
+                variables.append(k)
+        #
+        return variables

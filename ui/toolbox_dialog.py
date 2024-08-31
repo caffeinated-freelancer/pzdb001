@@ -8,6 +8,7 @@ from loguru import logger
 from pz.config import PzProjectConfig
 from services.characterize_service import CharacterizeService
 from services.file_transfer_service import FileTransferService
+from ui.config_holder import ConfigHolder
 from ui.ui_commons import PzUiCommons
 from ui.ui_utils import style101_dialog_layout
 from version import __pz_version__
@@ -21,15 +22,15 @@ from version import __pz_version__
 
 class FileTransferWorker(QThread):
     finished = pyqtSignal()
-    config: PzProjectConfig
+    configHolder: ConfigHolder
     file_transfer_service: FileTransferService
     sending_file: str | None
     progress_bar: QProgressDialog
 
-    def __init__(self, config: PzProjectConfig, service: FileTransferService, progress: QProgressDialog,
+    def __init__(self, holder: ConfigHolder, service: FileTransferService, progress: QProgressDialog,
                  sending_file: str | None = None):
         super().__init__()
-        self.config = config
+        self.configHolder = holder
         self.fileTransferService = service
         self.sending_file = sending_file
         self.progress_bar = progress
@@ -62,15 +63,15 @@ class FileTransferWorker(QThread):
 
 
 class ToolboxDialog(QDialog):
-    config: PzProjectConfig
+    configHolder: ConfigHolder
     uiCommons: PzUiCommons
     fileTransferService: FileTransferService | None
     progressBar: QProgressDialog | None
 
-    def __init__(self, cfg: PzProjectConfig):
-        self.config = cfg
-        self.uiCommons = PzUiCommons(self, self.config)
-        self.fileTransferService = FileTransferService(self.config)
+    def __init__(self, holder: ConfigHolder):
+        self.configHolder = holder
+        self.uiCommons = PzUiCommons(self, holder)
+        self.fileTransferService = FileTransferService(self.configHolder)
         self.progressBar = None
         super().__init__()
         self.setWindowTitle(f'設計師的工具小品 v{__pz_version__}')
@@ -118,7 +119,7 @@ class ToolboxDialog(QDialog):
                 self.progressBar.setWindowModality(Qt.WindowModality.NonModal)
                 self.progressBar.show()
 
-                self.worker = FileTransferWorker(self.config, self.fileTransferService, self.progressBar)
+                self.worker = FileTransferWorker(self.configHolder.get_config(), self.fileTransferService, self.progressBar)
                 self.worker.finished.connect(self.task_finished)
                 self.worker.start()
                 self.close()
@@ -142,7 +143,7 @@ class ToolboxDialog(QDialog):
                     self.progressBar.setFont(self.uiCommons.font16)
                     self.progressBar.show()
 
-                    self.worker = FileTransferWorker(self.config, self.fileTransferService, self.progressBar,
+                    self.worker = FileTransferWorker(self.configHolder.get_config(), self.fileTransferService, self.progressBar,
                                                      sending_file=file_name)
                     self.worker.finished.connect(self.task_finished)
                     self.worker.start()

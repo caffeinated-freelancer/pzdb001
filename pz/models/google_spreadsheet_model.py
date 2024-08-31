@@ -12,5 +12,9 @@ class GoogleSpreadSheetModelInterface(ABC):
         pass
 
     @abstractmethod
+    def get_variable_names(self) -> list[str]:
+        pass
+
+    @abstractmethod
     def new_instance(self, args: list[Any]) -> 'GoogleSpreadSheetModelInterface':
         pass

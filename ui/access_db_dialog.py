@@ -5,18 +5,19 @@ from pz.config import PzProjectConfig
 from pz_functions.exporters.member_to_access import member_to_access_db
 from pz_functions.importers.mysql_functions import write_access_to_mysql, migrate_access_table_to_mysql
 from pz_functions.mergers.member_merging import member_data_merging
+from ui.config_holder import ConfigHolder
 from ui.ui_commons import PzUiCommons
 from ui.ui_utils import style101_dialog_layout
 from version import __pz_version__
 
 
 class AccessDatabaseDialog(QDialog):
-    config: PzProjectConfig
+    configHolder: ConfigHolder
     uiCommons: PzUiCommons
 
-    def __init__(self, cfg: PzProjectConfig):
-        self.config = cfg
-        self.uiCommons = PzUiCommons(self, self.config)
+    def __init__(self, holder: ConfigHolder):
+        self.configHolder = holder
+        self.uiCommons = PzUiCommons(self, holder)
         super().__init__()
         self.setWindowTitle(f'MS-Access 資料庫 v{__pz_version__}')
 
@@ -52,7 +53,7 @@ class AccessDatabaseDialog(QDialog):
 
     def access_to_mysql(self):
         try:
-            write_access_to_mysql(self.config)
+            write_access_to_mysql(self.configHolder.get_config())
             self.uiCommons.done()
             self.uiCommons.show_message_dialog(
                 '學員基本資料匯入', '完成匯入： 學員基本資料 由 MS-Access 資料庫匯入 MySQL 資料庫')
@@ -62,7 +63,7 @@ class AccessDatabaseDialog(QDialog):
 
     def migrate_access_table_to_mysql(self):
         try:
-            count = migrate_access_table_to_mysql(self.config)
+            count = migrate_access_table_to_mysql(self.configHolder.get_config())
             self.uiCommons.done()
             self.uiCommons.show_message_dialog(
                 '資料表移轉', f'完成由 MS-Access 表匯入 {count} 筆資料到 MySQL')
@@ -72,17 +73,17 @@ class AccessDatabaseDialog(QDialog):
 
     def merge_access_database(self):
         try:
-            member_data_merging(self.config.ms_access_db.db_file, self.config.ms_access_db.target_table)
+            member_data_merging(self.configHolder.get_config().ms_access_db.db_file, self.configHolder.get_config().ms_access_db.target_table)
             self.uiCommons.done()
             self.uiCommons.show_message_dialog(
-                '資料匯整', f'資料匯整完成, 匯整至 {self.config.ms_access_db.target_table} 資料表')
+                '資料匯整', f'資料匯整完成, 匯整至 {self.configHolder.get_config().ms_access_db.target_table} 資料表')
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
             logger.error(e)
 
     def member_to_access(self):
         try:
-            records = member_to_access_db(self.config)
+            records = member_to_access_db(self.configHolder.get_config())
             self.uiCommons.done()
             self.uiCommons.show_message_dialog(
                 '學員資料匯入 Access', f'{records} 筆學員資料匯入 MS-Access 資料庫')

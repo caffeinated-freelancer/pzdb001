@@ -163,8 +163,12 @@ class ExcelTemplateService:
                     row_num += 1
                 callback_data_holder = datum
 
+            # logger.info(self.headers.items())
+
             for column_name, index in self.headers.items():
-                self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])
+                if index <= len(template_cells):
+                    self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])
+
                 if column_name in datum:
                     value = datum[column_name]
                     if isinstance(value, TextWithProperties):

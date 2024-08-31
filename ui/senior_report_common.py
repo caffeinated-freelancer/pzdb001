@@ -7,6 +7,7 @@ from loguru import logger
 from pz.config import PzProjectConfig
 from pz.models.general_processing_error import GeneralProcessingError
 from pz_functions.generaters.senior import generate_senior_reports
+from ui.config_holder import ConfigHolder
 from ui.processing_done_dialog import ProcessingDoneDialog
 from ui.ui_commons import PzUiCommons
 
@@ -55,16 +56,16 @@ class Worker(QThread):
 
 
 class SeniorReportCommon:
+    configHolder: ConfigHolder
     widget: QWidget
-    config: PzProjectConfig
     uiCommons: PzUiCommons
     progress_dialog: QProgressDialog | None
     worker: Worker | None
 
-    def __init__(self, widget: QWidget, ui_commons: PzUiCommons, cfg: PzProjectConfig) -> None:
+    def __init__(self, widget: QWidget, ui_commons: PzUiCommons, holder: ConfigHolder) -> None:
         self.widget = widget
         self.uiCommons = ui_commons
-        self.config = cfg
+        self.configHolder = holder
         self.progress_dialog = None
         self.worker = None
 
@@ -75,7 +76,7 @@ class SeniorReportCommon:
                                        with_questionnaire: bool = True,
                                        with_willingness: bool = True) -> None:
         try:
-            self.config.make_sure_output_folder_exists()
+            self.configHolder.get_config().make_sure_output_folder_exists()
 
             self.progress_dialog = QProgressDialog("編班及產生學長電聯表中, 請稍候", None, 0, 0)
             self.progress_dialog.setWindowTitle('產出學長電聯表及 A 表')
@@ -86,7 +87,7 @@ class SeniorReportCommon:
             # layout.setStretchFactor(self.progress_dialog, 1)  # Make progress bar fill available space
             self.progress_dialog.show()
 
-            self.worker = Worker(self.config, from_scratch, from_excel, no_fix_senior, with_table_b,
+            self.worker = Worker(self.configHolder.get_config(), from_scratch, from_excel, no_fix_senior, with_table_b,
                                  with_questionnaire=with_questionnaire, with_willingness=with_willingness)
             self.worker.finished.connect(self.task_finished)
             self.worker.start()
@@ -111,6 +112,7 @@ class SeniorReportCommon:
             logger.error(e)
         finally:
             if close_widget:
+                logger.debug("close widget")
                 self.widget.close()
 
     def task_finished(self):
@@ -128,13 +130,19 @@ class SeniorReportCommon:
             # logger.warning(f'{len(errors)} errors occurred')
 
             if len(errors) > 0:
-                logger.warning(f'{len(errors)} errors occurred')
-                button = PzUiCommons.create_a_button(f'開啟程式產出資料夾')
-                button.clicked.connect(lambda: self.config.explorer_output_folder())
-                dialog = ProcessingDoneDialog(
-                    self.config, '完成學長電聯表產出', ['等級', '警告訊息'], [
-                        [x.level_name(), x.message] for x in errors
-                    ], [[button]])
-                dialog.exec()
+                try:
+                    logger.warning(f'{len(errors)} errors occurred')
+                    button = PzUiCommons.create_a_button(f'開啟程式產出資料夾')
+                    button.clicked.connect(lambda: self.configHolder.get_config().explorer_output_folder())
+                    dialog = ProcessingDoneDialog(
+                        self.configHolder, '完成學長電聯表產出', ['等級', '警告訊息'], [
+                            [x.level_name(), x.message] for x in errors
+                        ], [[button]])
+                    dialog.exec()
+                except Exception as e:
+                    stack_trace = traceback.format_exc()  # Get stack trace as string
+                    print(f"Exception occurred: {str(e)}")
+                    print(f"Stack Trace:\n{stack_trace}")
+
             else:
-                self.config.explorer_output_folder()
+                self.configHolder.get_config().explorer_output_folder()

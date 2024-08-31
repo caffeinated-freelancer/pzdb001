@@ -5,18 +5,21 @@ from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz_functions.assists.checkin import export_all_members_for_checkin_system, export_class_member_for_checkin_system
+from ui.config_holder import ConfigHolder
 from ui.ui_commons import PzUiCommons
 from ui.ui_utils import style101_dialog_layout
 
 
 class CheckinSystemDialog(QDialog):
+    configHolder: ConfigHolder
     config: PzProjectConfig
     uiCommons: PzUiCommons
 
-    def __init__(self, cfg: PzProjectConfig):
+    def __init__(self, holder: ConfigHolder):
         super().__init__()
-        self.config = cfg
-        self.uiCommons = PzUiCommons(self, self.config)
+        self.configHolder = holder
+        self.config = holder.get_config()
+        self.uiCommons = PzUiCommons(self, holder)
 
         self.setWindowTitle(f'報到系統資料處理')
 

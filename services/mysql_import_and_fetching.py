@@ -201,6 +201,7 @@ CREATE TABLE `{self.current_table}`  (
                 GoogleClassMemberModel([]), check_formula=check_formula)
             params = []
             for member in members:
+                # logger.info(member.to_json())
                 param = []
                 have_error = False
                 for k, v in MysqlClassMemberEntity.VARIABLE_MAP.items():
@@ -232,7 +233,7 @@ CREATE TABLE `{self.current_table}`  (
                     else:
                         param.append(value)
                 if have_error:
-                    logger.warning(f'Error: {param}')
+                    logger.warning(f'Error: {param} {columns_insert}')
                 else:
                     params.append(tuple(param))
 

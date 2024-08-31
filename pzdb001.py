@@ -175,6 +175,7 @@ if __name__ == '__main__':
         logger.info("Merging card records to MySQL database ...")
         import_member_card_from_access(cfg)
     else:
+        # AttendRecordAsClassMemberService(cfg)
         app = QApplication([])
         # window = QWidget()
         # window.setWindowTitle("普中資料管理程式")

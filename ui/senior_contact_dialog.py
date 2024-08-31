@@ -1,8 +1,8 @@
 import os
 
-from PyQt6.QtWidgets import QDialog, QLabel, QCheckBox, QRadioButton, QComboBox
+from PyQt6.QtWidgets import QDialog, QLabel, QCheckBox, QComboBox
 
-from pz.config import PzProjectConfig
+from ui.config_holder import ConfigHolder
 from ui.dispatch_doc_dialog import DispatchDocDialog
 from ui.senior_report_common import SeniorReportCommon
 from ui.ui_commons import PzUiCommons
@@ -10,7 +10,7 @@ from ui.ui_utils import style101_dialog_layout
 
 
 class SeniorContactDialog(QDialog):
-    config: PzProjectConfig
+    configHolder: ConfigHolder
     uiCommons: PzUiCommons
     dispatchDocDialog: DispatchDocDialog
     seniorReportCommon: SeniorReportCommon
@@ -21,19 +21,19 @@ class SeniorContactDialog(QDialog):
     with_w_checkbox: QCheckBox
     willingness_combo: QComboBox
 
-    def __init__(self, cfg: PzProjectConfig):
-        self.config = cfg
-        self.uiCommons = PzUiCommons(self, self.config)
+    def __init__(self, holder: ConfigHolder):
+        self.configHolder = holder
+        self.uiCommons = PzUiCommons(self, holder)
         super().__init__()
 
         self.dispatchDocDialog = DispatchDocDialog()
-        self.seniorReportCommon = SeniorReportCommon(self, self.uiCommons, self.config)
+        self.seniorReportCommon = SeniorReportCommon(self, self.uiCommons, holder)
 
         self.setWindowTitle(f'[產出] 學長電聯表(自動分班)')
 
-        self.resize(420, 250)
+        self.resize(440, 250)
 
-        file_name = os.path.basename(cfg.excel.signup_next_info.spreadsheet_file)
+        file_name = os.path.basename(self.configHolder.get_config().excel.signup_next_info.spreadsheet_file)
         label = QLabel(f'Excel 檔: {file_name}')
         label.setFont(self.uiCommons.font10)
         self.senior_checkbox = QCheckBox("不要調整學長意願所屬班級 (可節省處理時間)")
@@ -42,7 +42,7 @@ class SeniorContactDialog(QDialog):
         self.with_b_checkbox = QCheckBox("產出 A 表時, 參考 B 表")
         self.with_b_checkbox.setFont(self.uiCommons.font12)
         self.with_b_checkbox.setChecked(False)
-        self.with_q_checkbox = QCheckBox("讀取意願調查表")
+        self.with_q_checkbox = QCheckBox("讀取意願調查表 （若不讀取意願調查表，新生部份資料將欠缺）")
         self.with_q_checkbox.setFont(self.uiCommons.font12)
         self.with_q_checkbox.setChecked(True)
 
@@ -67,7 +67,7 @@ class SeniorContactDialog(QDialog):
         # self.fix_senior_checkbox_value = senior_checkbox.isChecked()
 
         buttons_and_functions = [
-            [(f'Google {self.config.semester} 學員同步', self.google_to_mysql)],
+            [(f'Google {self.configHolder.get_config().semester} 學員同步', self.google_to_mysql)],
             [self.senior_checkbox],
             [self.with_b_checkbox],
             [self.with_q_checkbox],

@@ -147,3 +147,10 @@ def tuple_to_coordinate(row, col):
 
 def explorer_folder(folder: str):
     os.startfile(folder)
+
+
+def safe_index(target_list: list, looking_for: str, default_value: int) -> int:
+    try:
+        return target_list.index(looking_for)
+    except ValueError:
+        return default_value

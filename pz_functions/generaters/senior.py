@@ -5,7 +5,7 @@ from typing import Any
 
 from loguru import logger
 
-from pz.config import PzProjectConfig
+from pz.config import PzProjectConfig, PzProjectExcelSpreadsheetConfig
 from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
@@ -13,6 +13,7 @@ from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
 from pz.models.new_class_group_statistics import NewClassGroupStatistics
 from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
+from pz.models.post_lineup_model import PostLineupModel
 from pz.models.questionnaire_entry import QuestionnaireEntry
 from pz.models.senior_contact_advanced import SeniorContactAdvanced
 from pz.models.senior_contact_fundamental import SeniorContactFundamental
@@ -525,6 +526,75 @@ class SeniorReportGenerator:
             supplier = (lambda y=x: x for x in data)
             template.write_data(supplier)
 
+    def generate_post_lineup_from(self, filename: str, fullpath: str):
+        for class_name in self.new_senior_service.all_classes:
+            seniors = self.new_senior_service.all_classes[class_name]
+            data = []
+
+            for senior in seniors:
+                group_sn = 0
+
+                for assigned_member in senior.members:
+                    if isinstance(assigned_member.member, MixMember):
+
+                        member = assigned_member.member
+                        group_sn += 1
+
+                        phone_list = []
+                        if member.questionnaireInfo is not None:
+                            phone_list = [x for x in
+                                          [member.questionnaireInfo.mobilePhone, member.questionnaireInfo.homePhone] if
+                                          x is not None]
+                        elif member.detail is not None:
+                            detail = member.detail
+                            phone_list = [x for x in [detail.mobile_phone, detail.home_phone] if x is not None]
+
+                        datum: dict[str, str | int] = {
+                            '組別': senior.groupId,
+                            '組序': group_sn,
+                            '學員編號': member.get_student_id() if member.get_student_id() is not None else '',
+                            '班級': senior.className,
+                            '班別': senior.className,
+                            '學長': senior.fullName,
+                            '姓名': member.get_full_name(),
+                            '法名': member.get_dharma_name(),
+                            '性別': member.get_gender(),
+                            '學員電話行動&市話': "\n".join(phone_list),
+                        }
+                        data.append(datum)
+
+            spreadsheet = PzProjectExcelSpreadsheetConfig({
+                'spreadsheet_file': fullpath,
+                'header_row': 2,
+            })
+
+            template = ExcelTemplateService(PostLineupModel({}),
+                                            spreadsheet,
+                                            filename,
+                                            self.config.output_folder,
+                                            f'{class_name}')
+
+            sheet = template.get_sheet()
+
+            for i in range(1, 3):
+                title = sheet.cell(1, i).value
+                if title is not None and isinstance(title, str) and '{class_name}' in title:
+                    sheet.cell(1, i).value = title.replace('{class_name}', class_name)
+
+            supplier = (lambda y=x: x for x in data)
+            template.write_data(supplier, callback=lambda x, y, z: add_page_break(x, y))
+
+    def generate_post_lineups(self):
+        files = glob.glob(f'{self.config.excel.post_lineup_template_folder}/*.xlsx')
+
+        for filename in files:
+            f = os.path.basename(filename)
+            if not f.startswith("~$"):
+                try:
+                    self.generate_post_lineup_from(f, filename)
+                except Exception as e:
+                    logger.exception(e)
+
 
 def generate_senior_reports(cfg: PzProjectConfig,
                             from_scratch: bool, from_excel: bool | None = None,
@@ -536,6 +606,9 @@ def generate_senior_reports(cfg: PzProjectConfig,
         if not os.path.exists(cfg.excel.new_class_predefined_info.spreadsheet_file):
             from_scratch = True
 
+    logger.info(f'Spreadsheet: {cfg.excel.new_class_predefined_info.spreadsheet_file}')
+    # logger.info(f'Post Lineup: {cfg.excel.post_lineup_template_folder}')
+
     generator = SeniorReportGenerator(cfg, from_scratch)
     errors = generator.get_initial_errors()
 
@@ -544,10 +617,12 @@ def generate_senior_reports(cfg: PzProjectConfig,
     if cfg.excel.questionnaire.spreadsheet_folder is not None and cfg.excel.questionnaire.spreadsheet_folder != '':
         files = glob.glob(f'{cfg.excel.questionnaire.spreadsheet_folder}/*.xlsx')
 
+        file_counter = 0
         for filename in files:
             f = os.path.basename(filename)
             if not f.startswith("~$"):
                 try:
+                    file_counter += 1
                     err = generator.processing_senior_report(filename, from_excel=from_excel,
                                                              from_scratch=from_scratch, no_fix_senior=no_fix_senior,
                                                              with_table_b=with_table_b,
@@ -555,11 +630,29 @@ def generate_senior_reports(cfg: PzProjectConfig,
                                                              with_willingness=with_willingness)
                     generator.generate_new_class_lineup(filename)
                     generator.generate_class_groups_statistics(filename)
+                    generator.generate_post_lineups()
                     errors.extend(err)
                     return errors
                 except Exception as e:
                     logger.error(f'{filename} - {e}')
                     raise e
+        if file_counter == 0:
+            if not with_questionnaire:
+                filename = "沒有意願調查表.xlsx"
+                err = generator.processing_senior_report(filename, from_excel=from_excel,
+                                                         from_scratch=from_scratch, no_fix_senior=no_fix_senior,
+                                                         with_table_b=with_table_b,
+                                                         with_questionnaire=with_questionnaire,
+                                                         with_willingness=with_willingness)
+                generator.generate_new_class_lineup(filename)
+                generator.generate_class_groups_statistics(filename)
+                generator.generate_post_lineups()
+                errors.extend(err)
+                errors.append(GeneralProcessingError.error("注意! 沒有意願調查表將無法產出新生的基本資料。"))
+            else:
+                errors.append(GeneralProcessingError.error('沒有意願調查表'))
+
+            return errors
     else:
         err = generator.processing_senior_report(cfg.excel.questionnaire.spreadsheet_file, from_excel=from_excel,
                                                  from_scratch=from_scratch, no_fix_senior=no_fix_senior,

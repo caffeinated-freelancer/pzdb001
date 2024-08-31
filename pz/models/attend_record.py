@@ -22,6 +22,9 @@ class AttendRecord(ExcelModelInterface):
     groupNumber: str
     records: dict[str, str | None]
 
+    # transit
+    className: str
+
     def __init__(self, values: dict[str, str]):
         for k, v in AttendRecord.VARIABLE_MAP.items():
             # print(f'{k}: str')

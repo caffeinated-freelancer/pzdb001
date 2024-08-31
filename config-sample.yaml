@@ -53,7 +53,7 @@ google:
     # 當前的班級成員
     class_members:
       semester: '113-1'
-      spreadsheet_id: 'the_spread_id'
+      spreadsheet_id: 'the_spreadsheet_id'
       sheet_name: 'the_sheet_name'
       header_row: 2
       fields_map:
@@ -69,6 +69,11 @@ google:
         nextClasses:
           - '學員上課班別'
           - '發心上第二班禪修班'
+    # 雲端回寫的班級成員
+    class_members_for_upload:
+      spreadsheet_id: 'another_spreadsheet_id'
+      sheet_name: 'another_spreadsheet_name'
+      header_row: 1
     # 親眷朋友關係
     relationships:
       spreadsheet_id: '試算表的 Google ID'
@@ -109,6 +114,8 @@ excel:
     new_class_lineup:
       spreadsheet_file: '{TEMPLATE}\新編班資料-樣版.xlsx'
       header_row: 1
+  # 新班表格様版
+  post_lineup_template_folder: '{WORKSPACE}\新班表格'
   # 禪修班意願調查表
   questionnaire:
     # 意願調查放置的資料夾

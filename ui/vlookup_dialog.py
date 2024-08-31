@@ -5,6 +5,7 @@ from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz_functions.generaters.generate_lookup import generate_lookup
+from ui.config_holder import ConfigHolder
 from ui.processing_done_dialog import ProcessingDoneDialog
 from ui.ui_commons import PzUiCommons
 from ui.ui_utils import style101_dialog_layout
@@ -12,12 +13,12 @@ from version import __pz_version__
 
 
 class VLookUpDialog(QDialog):
-    config: PzProjectConfig
+    configHolder: ConfigHolder
     uiCommons: PzUiCommons
 
-    def __init__(self, cfg: PzProjectConfig):
-        self.config = cfg
-        self.uiCommons = PzUiCommons(self, self.config)
+    def __init__(self, holder: ConfigHolder):
+        self.configHolder = holder
+        self.uiCommons = PzUiCommons(self, holder)
         super().__init__()
         self.setWindowTitle(f'姓名 V 班級/組別 v{__pz_version__}')
 
@@ -67,14 +68,14 @@ class VLookUpDialog(QDialog):
         try:
             file_name, _ = QFileDialog.getOpenFileName(self, "開啟檔案", "", "Excel 檔案 (*.xlsx);; 所有檔案 (*)")
             if file_name:
-                saved_file, warnings = generate_lookup(self.config, file_name, via_access=via_access)
+                saved_file, warnings = generate_lookup(self.configHolder.get_config(), file_name, via_access=via_access)
                 self.close()
 
                 if len(warnings) > 0:
                     logger.warning(warnings)
                     button = self.uiCommons.create_a_button(f'開啟產出的 Excel 檔')
                     button.clicked.connect(lambda: os.startfile(saved_file))
-                    dialog = ProcessingDoneDialog(self.config, '完成 Vlookup',
+                    dialog = ProcessingDoneDialog(self.configHolder, '完成 Vlookup',
                                                   ['位置', '警告訊息'], warnings, [[button]])
                     dialog.exec()
                 else:

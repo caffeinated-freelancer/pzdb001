@@ -6,19 +6,20 @@ from loguru import logger
 
 from pz.config import PzProjectConfig
 from pz_functions.importers.mysql_functions import write_google_to_mysql
+from ui.config_holder import ConfigHolder
 
 
 class PzUiCommons:
     widget: QWidget
-    config: PzProjectConfig
+    configHolder: ConfigHolder
     font10 = QFont('Microsoft YaHei', 10)
     font12 = QFont('Microsoft YaHei', 12)
     font14 = QFont('Microsoft YaHei', 14)
     font16 = QFont('Microsoft YaHei', 16)
 
-    def __init__(self, widget: QWidget, cfg: PzProjectConfig) -> None:
+    def __init__(self, widget: QWidget, holder: ConfigHolder) -> None:
         self.widget = widget
-        self.config = cfg
+        self.configHolder = holder
 
         # self.font10 = QFont('Microsoft YaHei', 10)
         # self.font12 = QFont('Microsoft YaHei', 12)
@@ -73,7 +74,7 @@ class PzUiCommons:
 
     def google_to_mysql(self, check_formula: bool = False):
         try:
-            records = write_google_to_mysql(self.config, check_formula=check_formula)
+            records = write_google_to_mysql(self.configHolder.get_config(), check_formula=check_formula)
             self.done()
             self.show_message_dialog('Google 匯出', f'{records} 筆資料由 Google 的班級及升班資料匯到資料庫')
         except Exception as e:

@@ -7,17 +7,17 @@ from loguru import logger
 from pz.config import PzProjectConfig
 from pz.utils import explorer_folder
 from pz_functions.importers.member_details_update import member_details_update
+from ui.config_holder import ConfigHolder
 from ui.ui_commons import PzUiCommons
 from version import __pz_version__
 
 
 class MemberImportDialog(QDialog):
-    config: PzProjectConfig
+    configHolder: ConfigHolder
     uiCommons: PzUiCommons
 
-    def __init__(self, cfg: PzProjectConfig):
-        self.config = cfg
-        self.uiCommons = PzUiCommons(self, self.config)
+    def __init__(self, holder: ConfigHolder):
+        self.uiCommons = PzUiCommons(self, holder)
         super().__init__()
         self.setWindowTitle(f'學員基本資料匯入 v{__pz_version__}')
 
@@ -72,7 +72,7 @@ class MemberImportDialog(QDialog):
 
     def member_info_import(self):
         try:
-            member_details_update(self.config)
+            member_details_update(self.configHolder.get_config())
             self.uiCommons.done()
             self.uiCommons.show_message_dialog('匯入/更新學員基本資料', f'完成匯入/更新學員基本資料')
             self.close()
@@ -81,4 +81,4 @@ class MemberImportDialog(QDialog):
             logger.error(e)
 
     def open_member_import_folder(self):
-        explorer_folder(self.config.excel.member_details_update.spreadsheet_folder)
+        explorer_folder(self.configHolder.get_config().excel.member_details_update.spreadsheet_folder)
