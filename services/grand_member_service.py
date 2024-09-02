@@ -408,7 +408,7 @@ class PzGrandMemberService:
 
         if settings is not None:
             service = PzCloudSpreadsheetMemberService(settings, self.config.google.secret_file)
-            results: list[GoogleClassMemberModel] = service.read_all(GoogleClassMemberModel([]))
+            results: list[GoogleClassMemberModel] = service.read_all(GoogleClassMemberModel([]), settings.sheet_name)
             entities = []
             for result in results:
                 entities.append(MysqlClassMemberEntity([], [], google_member_detail=result))

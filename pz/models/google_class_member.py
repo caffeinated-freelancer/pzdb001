@@ -8,7 +8,7 @@ from pz.utils import full_name_to_real_name
 
 
 class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
-    SPREADSHEET_TITLE = '03-活動調查(所有學員)'
+    # SPREADSHEET_TITLE = '03-活動調查(所有學員)'
     VARIABLE_MAP: dict[str, str | list[str]] = {
         'sn': '總序',
         'groupSn': '序',
@@ -91,8 +91,8 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4, ensure_ascii=False)
 
-    def get_spreadsheet_title(self) -> str:
-        return GoogleClassMemberModel.SPREADSHEET_TITLE
+    # def get_spreadsheet_title(self) -> str:
+    #     return GoogleClassMemberModel.SPREADSHEET_TITLE
 
     def get_column_names(self) -> list[str]:
         # print(PzMember.VARIABLE_MAP)

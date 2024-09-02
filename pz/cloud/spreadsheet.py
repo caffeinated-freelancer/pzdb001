@@ -246,7 +246,9 @@ class SpreadsheetReadingService:
 
         spreadsheet = self.service.get_sheet_by_title(title)
 
-        if spreadsheet is not None:
+        if spreadsheet is None:
+            logger.error(f'{title} not found')
+        else:
             range_info = SpreadsheetRangeInfo(spreadsheet, title, col_names, header_row=header_row,
                                               reverse_index=reverse_index)
             # headers, h_row = spreadsheet.get_headers(header_row)

@@ -36,14 +36,14 @@ class PzCloudSpreadsheetMemberService:
 
     # def get_all_members(self) ->list[PzMember]:
     #     return self.allMembers
-    def read_all(self, model: GoogleSpreadSheetModelInterface, check_formula: bool = False) -> list[
+    def read_all(self, model: GoogleSpreadSheetModelInterface, spreadsheet_title: str, check_formula: bool = False) -> list[
         GoogleSpreadSheetModelInterface]:
 
         for i, col in enumerate(model.get_column_names()):
             logger.trace(f'{i} - {col}')
 
         results = self.service.read_sheet(
-            model.get_spreadsheet_title(), model.get_column_names(),
+            spreadsheet_title, model.get_column_names(),
             header_row=self.settings.header_row, read_formula=check_formula, reverse_index=False)
 
         # logger.warning(f'{results}')

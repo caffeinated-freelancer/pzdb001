@@ -198,7 +198,7 @@ CREATE TABLE `{self.current_table}`  (
             logger.info(f'Query: {query}')
 
             members: list[GoogleClassMemberModel] = service.read_all(
-                GoogleClassMemberModel([]), check_formula=check_formula)
+                GoogleClassMemberModel([]), settings.sheet_name, check_formula=check_formula)
             params = []
             for member in members:
                 # logger.info(member.to_json())
