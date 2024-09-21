@@ -122,6 +122,7 @@ excel:
     spreadsheet_folder: '{WORKSPACE}\禪修活動調查'
     header_row: 2
     header_on_blank_try: 1
+    page_mode: True
 
   # 禪修班意願調查表
   questionnaire:

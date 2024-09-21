@@ -10,8 +10,10 @@ from loguru import logger
 from pz.config import PzProjectConfig
 from pz.models.attend_record import AttendRecord
 from pz.models.excel_creation_model import ExcelCreationModelInterface
+from pz.models.google_class_member import GoogleClassMemberModel
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.utils import get_formatted_datetime
+from services.attend_record_service import AttendRecordAsClassMemberService
 from services.excel_creation_service import ExcelCreationService
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
@@ -98,7 +100,8 @@ class DifferenceRecord(ExcelCreationModelInterface):
         if entity.real_name != record.realName:
             logger.warning(
                 f'{class_name}/{group_id}, 學號: {entity.student_id}, 姓名不同 Google: {entity.real_name} <-> 個資:{record.realName}')
-            differences.append(f'個資上的姓名為: [{record.realName}], 法名: [{record.dharmaName if record.dharmaName is not None else ''}]')
+            differences.append(
+                f'個資上的姓名為: [{record.realName}], 法名: [{record.dharmaName if record.dharmaName is not None else ''}]')
         if e_dharma_name != r_dharma_name:
             if r_dharma_name != '':
                 differences.append(f'個資上的法名為: [{r_dharma_name}]')
@@ -127,73 +130,53 @@ class DifferenceRecord(ExcelCreationModelInterface):
 
 def generate_member_comparison_table(cfg: PzProjectConfig) -> tuple[
     str | None, list[str] | None, list[list[Any]] | None]:
-    graduation_cfg = cfg.excel.graduation
-    spreadsheet_cfg = graduation_cfg.records
-    # print(graduation_cfg)
-    cfg.make_sure_output_folder_exists()
-
     member_service = PzGrandMemberService(cfg, from_access=False, from_google=False)
 
     all_class_members = member_service.fetch_all_class_members()
 
-    files = glob.glob(f'{graduation_cfg.records.spreadsheet_folder}/*.xlsx')
-    processed_classes: set[str] = set()
+    service = AttendRecordAsClassMemberService(cfg)
 
+    attend_records: list[AttendRecord] = service.read_all_as_attend_records()
     difference_records: list[DifferenceRecord] = []
 
-    for filename in files:
-        f = os.path.basename(filename)
-        if not f.startswith("~$"):
-            matched = re.match(r'^(.*)_(.{2}).?_上課.*', filename)
+    for class_name in cfg.meditation_class_names:
+        records = [x for x in attend_records if x.className == class_name]
 
-            if matched:
-                class_name = matched.group(2)
-                if class_name in processed_classes:
-                    logger.warning(f'{class_name} 已經處理過了')
-                    continue
-                processed_classes.add(class_name)
+        member_in_class_group: dict[int, dict[int, MysqlClassMemberEntity]] = {}
 
-                member_in_class_group: dict[int, dict[int, MysqlClassMemberEntity]] = {}
-                for m in all_class_members:
-                    if m.class_name == class_name:
-                        if m.class_group not in member_in_class_group:
-                            member_in_class_group[m.class_group] = {}
-                        member_in_class_group[m.class_group][m.student_id] = m
+        for m in all_class_members:
+            if m.class_name == class_name:
+                if m.class_group not in member_in_class_group:
+                    member_in_class_group[m.class_group] = {}
+                member_in_class_group[m.class_group][m.student_id] = m
 
-                records_excel = ExcelWorkbookService(AttendRecord({}), filename, None,
-                                                     header_at=spreadsheet_cfg.header_row,
-                                                     ignore_parenthesis=spreadsheet_cfg.ignore_parenthesis,
-                                                     print_header=False,
-                                                     debug=False)
-                row_records: list[AttendRecord] = records_excel.read_all(required_attribute='studentId')
+        for record in records:
+            if record.className != class_name:
+                continue
 
-                for record in row_records:
-                    if record.realName.startswith('範例-'):
-                        continue
-                    student_id = int(record.studentId)
-                    group_id = int(record.groupName)
+            student_id = int(record.studentId)
+            group_id = int(record.groupName)
 
-                    if group_id not in member_in_class_group:
-                        logger.warning(f'Google 資料缺少 {class_name} {group_id} 群組')
-                    elif student_id not in member_in_class_group[group_id]:
-                        difference_records.append(DifferenceRecord.not_in_google(class_name, group_id, record))
-                        logger.warning(
-                            f'Google 資料缺少 {class_name} {group_id} {record.realName}/{record.dharmaName}/{record.studentId}')
-                    else:
-                        entry = member_in_class_group[group_id][student_id]
+            if group_id not in member_in_class_group:
+                logger.warning(f'Google 資料缺少 {class_name} {group_id} 群組')
+            elif student_id not in member_in_class_group[group_id]:
+                difference_records.append(DifferenceRecord.not_in_google(class_name, group_id, record))
+                logger.warning(
+                    f'Google 資料缺少 {class_name} {group_id} {record.realName}/{record.dharmaName}/{record.studentId}')
+            else:
+                entry = member_in_class_group[group_id][student_id]
 
-                        difference = DifferenceRecord.has_difference(record, entry)
+                difference = DifferenceRecord.has_difference(record, entry)
 
-                        if difference.differentType != DifferenceRecordType.NO_DIFFERENCE:
-                            difference_records.append(difference)
+                if difference.differentType != DifferenceRecordType.NO_DIFFERENCE:
+                    difference_records.append(difference)
 
-                        del member_in_class_group[group_id][student_id]
-
-                for group_id in member_in_class_group:
-                    for student_id in member_in_class_group[group_id]:
-                        entry = member_in_class_group[group_id][student_id]
-                        difference_records.append(DifferenceRecord.only_in_google(entry))
-                        logger.warning(f'{class_name}/{group_id}/{student_id}/{entry.real_name} 僅在 Google 學員')
+                del member_in_class_group[group_id][student_id]
+        for group_id in member_in_class_group:
+            for student_id in member_in_class_group[group_id]:
+                entry = member_in_class_group[group_id][student_id]
+                difference_records.append(DifferenceRecord.only_in_google(entry))
+                logger.warning(f'{class_name}/{group_id}/{student_id}/{entry.real_name} 僅在 Google 學員')
 
     if len(difference_records) > 0:
         model = DifferenceRecord('', 0)
@@ -215,3 +198,95 @@ def generate_member_comparison_table(cfg: PzProjectConfig) -> tuple[
         # os.startfile(full_file_path)
         return full_file_path, model.get_excel_headers(), data
     return None, None, None
+
+
+# def generate_member_comparison_table_v1(cfg: PzProjectConfig) -> tuple[
+#     str | None, list[str] | None, list[list[Any]] | None]:
+#     graduation_cfg = cfg.excel.graduation
+#     spreadsheet_cfg = graduation_cfg.records
+#     # print(graduation_cfg)
+#     cfg.make_sure_output_folder_exists()
+#
+#     member_service = PzGrandMemberService(cfg, from_access=False, from_google=False)
+#
+#     all_class_members = member_service.fetch_all_class_members()
+#
+#     files = glob.glob(f'{graduation_cfg.records.spreadsheet_folder}/*.xlsx')
+#     processed_classes: set[str] = set()
+#
+#     difference_records: list[DifferenceRecord] = []
+#
+#     for filename in files:
+#         f = os.path.basename(filename)
+#         if not f.startswith("~$"):
+#             matched = re.match(r'^(.*)_(.{2}).?_上課.*', filename)
+#
+#             if matched:
+#                 class_name = matched.group(2)
+#                 if class_name in processed_classes:
+#                     logger.warning(f'{class_name} 已經處理過了')
+#                     continue
+#                 processed_classes.add(class_name)
+#
+#                 member_in_class_group: dict[int, dict[int, MysqlClassMemberEntity]] = {}
+#                 for m in all_class_members:
+#                     if m.class_name == class_name:
+#                         if m.class_group not in member_in_class_group:
+#                             member_in_class_group[m.class_group] = {}
+#                         member_in_class_group[m.class_group][m.student_id] = m
+#
+#                 records_excel = ExcelWorkbookService(AttendRecord({}), filename, None,
+#                                                      header_at=spreadsheet_cfg.header_row,
+#                                                      ignore_parenthesis=spreadsheet_cfg.ignore_parenthesis,
+#                                                      print_header=False,
+#                                                      debug=False)
+#                 row_records: list[AttendRecord] = records_excel.read_all(required_attribute='studentId')
+#
+#                 for record in row_records:
+#                     if record.realName.startswith('範例-'):
+#                         continue
+#                     student_id = int(record.studentId)
+#                     group_id = int(record.groupName)
+#
+#                     if group_id not in member_in_class_group:
+#                         logger.warning(f'Google 資料缺少 {class_name} {group_id} 群組')
+#                     elif student_id not in member_in_class_group[group_id]:
+#                         difference_records.append(DifferenceRecord.not_in_google(class_name, group_id, record))
+#                         logger.warning(
+#                             f'Google 資料缺少 {class_name} {group_id} {record.realName}/{record.dharmaName}/{record.studentId}')
+#                     else:
+#                         entry = member_in_class_group[group_id][student_id]
+#
+#                         difference = DifferenceRecord.has_difference(record, entry)
+#
+#                         if difference.differentType != DifferenceRecordType.NO_DIFFERENCE:
+#                             difference_records.append(difference)
+#
+#                         del member_in_class_group[group_id][student_id]
+#
+#                 for group_id in member_in_class_group:
+#                     for student_id in member_in_class_group[group_id]:
+#                         entry = member_in_class_group[group_id][student_id]
+#                         difference_records.append(DifferenceRecord.only_in_google(entry))
+#                         logger.warning(f'{class_name}/{group_id}/{student_id}/{entry.real_name} 僅在 Google 學員')
+#
+#     if len(difference_records) > 0:
+#         model = DifferenceRecord('', 0)
+#
+#         service = ExcelCreationService(model)
+#
+#         data: list[list[Any]] = []
+#         for model in difference_records:
+#             data.append(model.get_values_in_pecking_order())
+#
+#         supplier = (lambda y=x: x for x in data)
+#         service.write_data(supplier)
+#
+#         formatted_date_time = get_formatted_datetime()
+#
+#         file_name = f'Google 學員資料差異_{formatted_date_time}.xlsx'
+#         full_file_path = f'{cfg.output_folder}/{file_name}'
+#         service.save(full_file_path)
+#         # os.startfile(full_file_path)
+#         return full_file_path, model.get_excel_headers(), data
+#     return None, None, None

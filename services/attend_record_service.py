@@ -8,9 +8,7 @@ from loguru import logger
 from pz.config import PzProjectConfig
 from pz.models.attend_record import AttendRecord
 from pz.models.google_class_member import GoogleClassMemberModel
-from pz.models.new_class_senior import NewClassSeniorModel
 from services.excel_workbook_service import ExcelWorkbookService
-from services.new_class_senior_service import NewClassSeniorService
 from services.senior_deacon_service import SeniorDeaconService
 
 
@@ -102,21 +100,22 @@ class AttendRecordAsClassMemberService:
         return model
 
     def _read_each_file(self, detail: AttendRecordFileDetail) -> list[GoogleClassMemberModel]:
-        full_path_name = f'{self.config.excel.graduation.records.spreadsheet_folder}/{detail.filename}'
-
-        service = ExcelWorkbookService(AttendRecord({}), full_path_name, None,
-                                       header_at=self.config.excel.graduation.records.header_row,
-                                       ignore_parenthesis=self.config.excel.graduation.records.ignore_parenthesis,
-                                       print_header=False, debug=False)
-        raw_records: list[AttendRecord] = service.read_all(required_attribute='studentId')
+        # full_path_name = f'{self.config.excel.graduation.records.spreadsheet_folder}/{detail.filename}'
+        #
+        # service = ExcelWorkbookService(AttendRecord({}), full_path_name, None,
+        #                                header_at=self.config.excel.graduation.records.header_row,
+        #                                ignore_parenthesis=self.config.excel.graduation.records.ignore_parenthesis,
+        #                                print_header=False, debug=False)
+        # raw_records: list[AttendRecord] = service.read_all(required_attribute='studentId')
+        raw_records = self._read_each_file_as_attend_records(detail)
 
         # headers = records_excel.get_headers()
 
         models: list[GoogleClassMemberModel] = []
         pos = 0
         for record in raw_records:
-            if record.realName is None or record.realName.startswith('範例-'):
-                continue
+            # if record.realName is None or record.realName.startswith('範例-'):
+            #     continue
             record.className = detail.class_name
             pos += 1
             record.recordOrder = pos
@@ -126,9 +125,29 @@ class AttendRecordAsClassMemberService:
 
         return models
 
+    def _read_each_file_as_attend_records(self, detail: AttendRecordFileDetail) -> list[AttendRecord]:
+        full_path_name = f'{self.config.excel.graduation.records.spreadsheet_folder}/{detail.filename}'
+
+        service = ExcelWorkbookService(AttendRecord({}), full_path_name, None,
+                                       header_at=self.config.excel.graduation.records.header_row,
+                                       ignore_parenthesis=self.config.excel.graduation.records.ignore_parenthesis,
+                                       print_header=False, debug=False)
+        raw_records: list[AttendRecord] = service.read_all(required_attribute='studentId')
+        records = [x for x in raw_records if x.realName is not None and not x.realName.startswith('範例-')]
+        for record in records:
+            record.className = detail.class_name
+        return records
+        # return  raw_records
+
     # @staticmethod
     # def senior_key(senior: NewClassSeniorModel) -> str:
     #     return f'{senior.className}_{senior.groupId}_{senior.fullName}_{senior.dharmaName}'
+
+    def read_all_as_attend_records(self) -> list[AttendRecord]:
+        records: list[AttendRecord] = []
+        for detail in self.file_details:
+            records.extend(self._read_each_file_as_attend_records(detail))
+        return records
 
     def read_all(self) -> list[GoogleClassMemberModel]:
         # senior_deacons: dict[str, NewClassSeniorModel] = {}
