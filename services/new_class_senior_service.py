@@ -4,11 +4,11 @@ from debugging.check import debug_on_student_id
 from pz.config import PzProjectConfig
 from pz.models.auto_assignment_step import AutoAssignmentStepEnum
 from pz.models.class_and_gender import ClassAndGender
+from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.mix_member import MixMember
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.new_class_lineup import NewClassLineup
 from pz.models.new_class_senior import NewClassSeniorModel
-from pz.models.general_processing_error import GeneralProcessingError
 from pz.models.signup_next_info import SignupNextInfoModel
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
@@ -26,7 +26,7 @@ class NewClassSeniorService:
     def __init__(self, cfg: PzProjectConfig, member_service: PzGrandMemberService):
         self.config = cfg
 
-        new_class_seniors = self._read_all()
+        new_class_seniors = self.read_all_seniors(self.config)
         self.senior_by_class_gender = {}
         self.senior_by_class_group = {}
         self.senior_by_student_id = {}
@@ -148,10 +148,11 @@ class NewClassSeniorService:
     def key_of_senior_by_group_id(class_name: str, group_id: int):
         return f'{class_name}-{group_id}'
 
-    def _read_all(self) -> list[NewClassSeniorModel]:
-        workbook = ExcelWorkbookService(NewClassSeniorModel({}), self.config.excel.new_class_senior.spreadsheet_file,
-                                        header_at=self.config.excel.new_class_senior.header_row,
-                                        sheet_name=self.config.excel.new_class_senior.sheet_name,
+    @staticmethod
+    def read_all_seniors(config: PzProjectConfig) -> list[NewClassSeniorModel]:
+        workbook = ExcelWorkbookService(NewClassSeniorModel({}), config.excel.new_class_senior.spreadsheet_file,
+                                        header_at=config.excel.new_class_senior.header_row,
+                                        sheet_name=config.excel.new_class_senior.sheet_name,
                                         debug=False)
 
         entries: list[NewClassSeniorModel] = workbook.read_all(required_attribute='fullName')

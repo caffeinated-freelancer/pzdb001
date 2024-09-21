@@ -35,6 +35,7 @@ class PzQuestionnaireInfo(ExcelModelInterface):
         'parentsPhone': '家長聯絡電話',
         'bookkeepingDate': '資料組登陸日期',
         'remark': '備註',
+        'cancel': '取消上課',
     }
 
     no: str
@@ -66,10 +67,11 @@ class PzQuestionnaireInfo(ExcelModelInterface):
     parentsPhone: str
     bookkeepingDate: str
     remark: str
+    cancel: str
 
     classmate: str | None
     followee: 'QuestionnaireEntry'
-    followers: list['MixMember']
+    followers: list['MixMember'] | None
 
     def __init__(self, values: dict[str, str]):
         for k, v in PzQuestionnaireInfo.VARIABLE_MAP.items():

@@ -7,9 +7,9 @@ from loguru import logger
 
 from pz.config import PzProjectConfig, PzProjectExcelSpreadsheetConfig
 from pz.models.attend_record import AttendRecord
-from pz.models.graduation_standards import GraduationStandards
 from pz.models.output_graduation import PzGraduationForOutput
 from pz.models.text_with_properties import TextWithProperties
+from services.attend_record_service import AttendRecordFileDetail
 from services.excel_template_service import ExcelTemplateService
 from services.excel_workbook_service import ExcelWorkbookService
 
@@ -22,19 +22,19 @@ def add_page_break(datum, prev_datum) -> tuple[Any, bool]:
     return datum, False
 
 
-def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, GraduationStandards],
-                               spreadsheet_cfg: PzProjectExcelSpreadsheetConfig, filename: str):
-    matched = re.match(r'^(.*)_(.*)_上課.*', filename)
-
-    if matched:
-        class_name = matched.group(2)
+def generate_graduation_report(cfg: PzProjectConfig, spreadsheet_cfg: PzProjectExcelSpreadsheetConfig,
+                               detail: AttendRecordFileDetail, filename: str):
+    if detail.class_name is None:
+        logger.warning(f'{detail.filename} 檔名需按標準命名 精舍名_班級名_上課...')
+    else:
+        class_name = detail.class_name
         # print(class_name)
 
-        if class_name not in standards:
-            print(f'{class_name} 班級沒有設定好結業標準, 程式無法處理')
-            return
+        # if class_name not in standards:
+        #     print(f'{class_name} 班級沒有設定好結業標準, 程式無法處理')
+        #     return
 
-        standard = standards[class_name]
+        # standard = standards[class_name]
 
         records_excel = ExcelWorkbookService(AttendRecord({}), filename, None,
                                              header_at=spreadsheet_cfg.header_row,
@@ -48,7 +48,7 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
 
         template_service = ExcelTemplateService(PzGraduationForOutput({}),
                                                 cfg.excel.graduation.template,
-                                                filename,
+                                                detail.filename,
                                                 cfg.output_folder,
                                                 f'[結業統計表][{class_name}]',
                                                 debug=False)
@@ -123,7 +123,7 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
         for day, count in vacations.items():
             if count * 3 >= len(records) * 2:
                 vacation_days.add(day)
-                logger.info(f'{count} against {len(records)} - add {day} as vacation ({filename})')
+                logger.info(f'{count} against {len(records)} - add {day} as vacation ({detail.filename})')
 
         for day, count in blank_days.items():
             if count * 3 >= len(records) * 2:
@@ -162,7 +162,7 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                 '姓名': record.realName,
                 '法名': record.dharmaName,
                 '性別': record.gender,
-                '班別': standard.className,
+                '班別': class_name,
                 '組別': record.groupName,
                 '組號': current_group_number,
                 '序號': group_serial_no,
@@ -183,10 +183,12 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
 
                                 if value == 'F':
                                     if day not in vacation_days:
-                                        logger.warning(f'糟糕! {day} 大部份的學員*不是是放香*, 但 {record.realName} 卻能放香')
+                                        logger.warning(
+                                            f'糟糕! {day} 大部份的學員*不是是放香*, 但 {record.realName} 卻能放香')
                                 else:
                                     if day in vacation_days:
-                                        logger.warning(f'糟糕! {day} 大部份的學員是放香, 但 {record.realName} 是 {value}')
+                                        logger.warning(
+                                            f'糟糕! {day} 大部份的學員是放香, 但 {record.realName} 是 {value}')
                             else:
                                 logger.warning(
                                     f'{record.realName} / {class_name} 在 {day} 的記錄為 {value}, 但大部份的學員都還沒有記錄影(時間未到)')
@@ -207,6 +209,12 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
 
         notes = cfg.excel.graduation.template.additional_notes
 
+        graduation_warning_tag = '結業預警'
+        graduation_warning = 'H'
+
+        if graduation_warning_tag in notes:
+            graduation_warning = notes[graduation_warning_tag]
+
         for datum in data:
             attend_counters = datum['counters']
             # print(f'{len(days)} - {len(vacations)} = {len(days) - len(vacations)}, weeks: {weeks}')
@@ -222,15 +230,21 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
                         datum['結業'] = notes['結業在即'] if '結業在即' in notes else 'K'
                     else:
                         attend_counters = saved
-                        attend_counters['M'] += attend_counters['O']
-                        attend_counters['M'] += attend_counters['A']
-                        attend_counters['M'] += attend_counters['_']
+
+                        make_up = attend_counters['O'] + attend_counters['A'] + attend_counters['_']
+                        m_org = attend_counters['M']
+                        attend_counters['M'] += make_up
                         attend_counters['A'] = 0
                         attend_counters['O'] = 0
                         attend_counters['_'] = 0
                         if graduation_standard.calculate(attend_counters):
-                            datum['結業'] = TextWithProperties(notes['結業預警'] if '結業預警' in notes else 'H',
-                                                               {'color': 'FF0000'})
+                            for i in range(1, m_org + 1):
+                                attend_counters['M'] = m_org + i
+                                attend_counters['O'] = make_up - i
+                                if graduation_standard.calculate(attend_counters):
+                                    m = graduation_warning.replace("{{m}}", str(i))
+                                    datum['結業'] = TextWithProperties(m, {'color': 'FF0000'})
+                                    break
                     attend_counters = saved
             else:
                 if graduation_standard is not None:
@@ -246,8 +260,6 @@ def generate_graduation_report(cfg: PzProjectConfig, standards: dict[str, Gradua
 
         supplier = (lambda y=x: x for x in data)
         template_service.write_data(supplier, callback=lambda x, y, z: add_page_break(x, y))
-    else:
-        logger.warning(f'{filename} 檔名需按標準命名 精舍名_班級名_上課...')
 
 
 def generate_graduation_reports(cfg: PzProjectConfig):
@@ -256,23 +268,25 @@ def generate_graduation_reports(cfg: PzProjectConfig):
     cfg.make_sure_output_folder_exists()
     cfg.explorer_output_folder()
 
-    standards_excel = ExcelWorkbookService(GraduationStandards({}), graduation_cfg.standards.spreadsheet_file,
-                                           None, debug=True)
-
-    all_standards: list[GraduationStandards] = standards_excel.read_all('className')
-    standards: dict[str, GraduationStandards] = {}
-
-    for standard in all_standards:
-        key = standard.classNameInFile if standard.classNameInFile is not None and standard.classNameInFile != '' else standard.className
-        standards[key] = standard
+    # standards_excel = ExcelWorkbookService(GraduationStandards({}), graduation_cfg.standards.spreadsheet_file,
+    #                                        None, debug=True)
+    #
+    # all_standards: list[GraduationStandards] = standards_excel.read_all('className')
+    # standards: dict[str, GraduationStandards] = {}
+    #
+    # for standard in all_standards:
+    #     key = standard.classNameInFile if standard.classNameInFile is not None and standard.classNameInFile != '' else standard.className
+    #     standards[key] = standard
 
     files = glob.glob(f'{graduation_cfg.records.spreadsheet_folder}/*.xlsx')
 
     for filename in files:
         f = os.path.basename(filename)
         if not f.startswith("~$"):
+            detail = AttendRecordFileDetail(cfg, f)
+
             try:
-                generate_graduation_report(cfg, standards, graduation_cfg.records, filename)
+                generate_graduation_report(cfg, graduation_cfg.records, detail, filename)
             except Exception as e:
                 logger.warning(f'{filename} - {e}')
         # break

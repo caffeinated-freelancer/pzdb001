@@ -101,6 +101,12 @@ class QuestionnaireService:
             f'Assignment Step {AutoAssignmentStepEnum.INTRODUCER_AS_SENIOR} / {AutoAssignmentStepEnum.INTRODUCER_FOLLOWING}')
 
         for entry in entries:
+            if entry.fullName is None:
+                continue
+
+            if entry.cancel is not None and entry.cancel != '':
+                continue
+
             if entry.registerClass is not None and entry.registerClass != '':  # 所有有意願調查有指定班級的
                 class_name = entry.registerClass.replace('班', '')
                 entry.mobilePhone = phone_number_normalize(entry.mobilePhone)

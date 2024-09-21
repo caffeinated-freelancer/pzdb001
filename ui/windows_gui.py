@@ -12,6 +12,7 @@ from loguru import logger
 from pz.config import PzProjectConfig
 from pz.utils import explorer_folder
 from pz_functions.exporters.member_details_exporter import export_member_details
+from pz_functions.generaters.activity_survey import activity_survey
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
 from pz_functions.generaters.member_comparison import generate_member_comparison_table
@@ -216,6 +217,9 @@ class PyPzWindows(QMainWindow):
         self.configHolder.get_config().make_sure_output_folder_exists()
         explorer_folder(self.configHolder.get_config().output_folder)
 
+    def open_activity_survey_folder(self):
+        explorer_folder(self.configHolder.get_config().excel.meditation_activity_survey.spreadsheet_folder)
+
     # def access_to_mysql(self):
     #     try:
     #         write_access_to_mysql(self.config)
@@ -345,6 +349,12 @@ class PyPzWindows(QMainWindow):
     def open_pilgrimage_dialog(self):
         self.pilgrimageDialog.exec()
 
+    def meditation_activity_survey(self):
+        try:
+            activity_survey(self.configHolder.get_config())
+        except Exception as e:
+            self.uiCommons.show_error_dialog(e)
+
     def change_to_full_layout(self):
         try:
             self.pzCentralLayout = QVBoxLayout()
@@ -369,12 +379,15 @@ class PyPzWindows(QMainWindow):
         buttons_and_functions = [
             [
                 ('🔎 姓名 V 班級/組別🔸', self.vlookup_by_name),
-            ],
-            [
                 (f'🔄 Google {self.configHolder.get_config().semester} 學員同步', self.google_to_mysql),
             ],
             [
+                (f'📝 禪修活動調查', self.meditation_activity_survey),
+                ('📁 禪修活動資料夾', self.open_activity_survey_folder),
+            ],
+            [
                 ('🔼 切換成完整版', self.change_to_full_layout),
+                ('📁 程式輸出', self.open_output_folder),
             ],
         ]
         self.pzCentralLayout.addLayout(style101_button_creation(self.uiCommons, buttons_and_functions))

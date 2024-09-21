@@ -122,6 +122,9 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
         if entry.fullName is None:
             continue
 
+        if entry.cancel is not None and entry.cancel != '':
+            continue
+
         phone_list = [entry.mobilePhone, entry.parentsPhone, entry.homePhone]
         phones = list(OrderedDict.fromkeys(item for item in phone_list if item))
 

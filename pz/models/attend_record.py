@@ -24,6 +24,7 @@ class AttendRecord(ExcelModelInterface):
 
     # transit
     className: str
+    recordOrder: int
 
     def __init__(self, values: dict[str, str]):
         for k, v in AttendRecord.VARIABLE_MAP.items():
@@ -39,6 +40,8 @@ class AttendRecord(ExcelModelInterface):
                 matched = re.match(r'^(\d{1,2})/(\d{1,2})$', k)
                 if matched:
                     self.records[k] = v
+
+        self.recordOrder = 0
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4, ensure_ascii=False)

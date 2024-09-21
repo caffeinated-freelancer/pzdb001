@@ -9,6 +9,7 @@ from pz.comparators import deacon_based_class_member_comparator, deacon_based_cl
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
 from pz.models.google_class_member import GoogleClassMemberModel
 from pz.models.member_in_access import MemberInAccessDB
+from pz.models.member_with_detail import MemberWithDetail
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
 from pz.models.pz_class import PzClass
@@ -454,3 +455,9 @@ class PzGrandMemberService:
 
     def fetch_all_class_members(self) -> list[MysqlClassMemberEntity]:
         return self.all_class_members
+
+    def fetch_all_class_members_with_details(self) -> list[MemberWithDetail]:
+        return [MemberWithDetail(
+            x,
+            self.find_member_details_by_student_id(x.student_id)
+        ) for x in self.all_class_members]

@@ -1,3 +1,4 @@
+import functools
 import glob
 import os
 import re
@@ -7,7 +8,10 @@ from loguru import logger
 from pz.config import PzProjectConfig
 from pz.models.attend_record import AttendRecord
 from pz.models.google_class_member import GoogleClassMemberModel
+from pz.models.new_class_senior import NewClassSeniorModel
 from services.excel_workbook_service import ExcelWorkbookService
+from services.new_class_senior_service import NewClassSeniorService
+from services.senior_deacon_service import SeniorDeaconService
 
 
 def simplify_class_name(config: PzProjectConfig, full_class_name: str) -> str | None:
@@ -65,30 +69,26 @@ class AttendRecordAsClassMemberService:
         self.config = cfg
 
         files = glob.glob(f'{cfg.excel.graduation.records.spreadsheet_folder}/*.xlsx')
-        file_maps: dict[str, list[AttendRecordFileDetail]] = {}
-        max_timestamp: int = 0
-        target_key = ''
+
+        class_file_map: dict[str, AttendRecordFileDetail] = {}
 
         for filename in files:
             f = os.path.basename(filename)
             if not f.startswith("~$"):
                 detail = AttendRecordFileDetail(self.config, f)
                 if detail.class_name is not None:
-                    max_timestamp = max(max_timestamp, detail.timestamp)
+                    if detail.class_name not in cfg.meditation_class_names:
+                        logger.warning(f'班級名稱 {detail.class_name}: 設定檔中, 未設定')
+                        continue
 
-                    if detail.timestamp == max_timestamp:
-                        key = detail.map_key()
-                        if key in file_maps:
-                            if target_key != key:
-                                logger.error(f'糟糕, key 對不上 {key} vs {target_key}')
-                            else:
-                                file_maps[key].append(detail)
-                        else:
-                            file_maps[key] = [detail]
-                            target_key = key
+                    if detail.class_name not in class_file_map:
+                        class_file_map[detail.class_name] = detail
+                    elif class_file_map[detail.class_name].timestamp < detail.timestamp:
+                        class_file_map[detail.class_name] = detail
 
         # logger.info(f'key: {target_key}, {len(file_maps[target_key])}')
-        self.file_details = [detail for detail in file_maps[target_key]]
+        self.file_details = [class_file_map[x] for x in cfg.meditation_class_names if x in class_file_map]
+        # self.file_details = [detail for detail in file_maps[target_key]]
 
     def attend_record_to_google(self, record: AttendRecord) -> GoogleClassMemberModel:
         model = GoogleClassMemberModel([])
@@ -97,6 +97,7 @@ class AttendRecordAsClassMemberService:
             model.__dict__[v] = record.__dict__[k]
 
         model.realName = model.fullName
+        model.recordOrder = record.recordOrder
 
         return model
 
@@ -112,17 +113,34 @@ class AttendRecordAsClassMemberService:
         # headers = records_excel.get_headers()
 
         models: list[GoogleClassMemberModel] = []
+        pos = 0
         for record in raw_records:
             if record.realName is None or record.realName.startswith('範例-'):
                 continue
             record.className = detail.class_name
+            pos += 1
+            record.recordOrder = pos
             model = self.attend_record_to_google(record)
             models.append(model)
             # print(model.to_json())
 
         return models
 
+    # @staticmethod
+    # def senior_key(senior: NewClassSeniorModel) -> str:
+    #     return f'{senior.className}_{senior.groupId}_{senior.fullName}_{senior.dharmaName}'
+
     def read_all(self) -> list[GoogleClassMemberModel]:
+        # senior_deacons: dict[str, NewClassSeniorModel] = {}
+        # class_senior: dict[str, NewClassSeniorModel] = {}
+        #
+        # for senior in NewClassSeniorService.read_all_seniors(self.config):
+        #     senior_deacons[self.senior_key(senior)] = senior
+        #     if senior.senior is not None and senior.senior == '學長':
+        #         class_senior[f'{senior.className}_{senior.groupId}'] = senior
+
+        deacon_service = SeniorDeaconService(self.config)
+
         class_members: dict[str, list[GoogleClassMemberModel]] = {}
 
         for detail in self.file_details:
@@ -133,4 +151,44 @@ class AttendRecordAsClassMemberService:
             if class_name in class_members:
                 models.extend(class_members[class_name])
 
-        return models
+        for model in models:
+            key = f'{model.className}_{model.classGroup}_{model.fullName}_{model.dharmaName}'
+            if key in deacon_service.senior_deacons:
+                entry = deacon_service.senior_deacons.pop(key)
+                if entry.deacon is not None and entry.deacon != '':
+                    model.deacon = entry.deacon
+                elif entry.senior is not None and entry.senior != '':
+                    model.deacon = entry.senior
+
+            key = f'{model.className}_{model.classGroup}'
+            if key in deacon_service.class_senior:
+                model.senior = deacon_service.class_senior[key].fullName
+
+        for k, v in deacon_service.senior_deacons:
+            logger.warning(f'{k}: {v.fullName}')
+
+        sorted_list = sorted(models, key=functools.cmp_to_key(
+            lambda a, b: comparator(a, b, self.config.meditation_class_names)))
+
+        return sorted_list
+
+
+def comparator(a: GoogleClassMemberModel, b: GoogleClassMemberModel, class_names: list[str]) -> int:
+    if a.className == b.className:
+        if a.classGroup == b.classGroup:
+            if a.senior == a.fullName:
+                return -1
+            elif b.senior == b.fullName:
+                return 1
+            elif a.deacon is not None and a.deacon != '':
+                if b.deacon is not None and b.deacon != '':
+                    pass
+                else:
+                    return -1
+            elif b.deacon is not None and b.deacon != '':
+                return 1
+            return a.recordOrder - b.recordOrder
+        else:
+            return int(a.classGroup) - int(b.classGroup)
+    else:
+        return class_names.index(a.className) - class_names.index(b.className)

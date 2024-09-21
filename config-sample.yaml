@@ -116,6 +116,13 @@ excel:
       header_row: 1
   # 新班表格様版
   post_lineup_template_folder: '{WORKSPACE}\新班表格'
+
+  # 禪修活動調查
+  meditation_activity_survey:
+    spreadsheet_folder: '{WORKSPACE}\禪修活動調查'
+    header_row: 2
+    header_on_blank_try: 1
+
   # 禪修班意願調查表
   questionnaire:
     # 意願調查放置的資料夾

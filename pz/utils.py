@@ -1,6 +1,16 @@
 import datetime
+import glob
 import os
 import re
+
+
+class PzFile:
+    filepath: str
+    filename: str
+
+    def __init__(self, filepath):
+        self.filepath = filepath
+        self.filename = os.path.basename(filepath)
 
 
 def personal_id_verification(id_number: str, debug: bool = False) -> bool:
@@ -154,3 +164,16 @@ def safe_index(target_list: list, looking_for: str, default_value: int) -> int:
         return target_list.index(looking_for)
     except ValueError:
         return default_value
+
+
+def excel_files_in_folder(folder: str) -> list[PzFile]:
+    files = glob.glob(f'{folder}/*.xlsx')
+
+    excel_files = []
+
+    for file in files:
+        pz_file = PzFile(file)
+        if not pz_file.filename.startswith("~$"):
+            excel_files.append(pz_file)
+
+    return excel_files

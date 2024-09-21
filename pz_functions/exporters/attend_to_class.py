@@ -2,6 +2,7 @@ from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
 from pz.models.google_class_member import GoogleClassMemberModel
 from services.attend_record_service import AttendRecordAsClassMemberService
+from services.grand_member_service import PzGrandMemberService
 
 
 def remap_if_possible(cfg: PzProjectConfig):
@@ -13,7 +14,11 @@ def remap_if_possible(cfg: PzProjectConfig):
 
 def from_attend_records_to_class(cfg: PzProjectConfig):
     service = AttendRecordAsClassMemberService(cfg)
+    # grand_member_service = PzGrandMemberService(cfg)
+    # senior_service = NewClassSeniorService(cfg, grand_member_service)
     models = service.read_all()
+
+    # senior_service.
 
     # for model in models:
     #     print(

@@ -21,6 +21,8 @@ class PzProjectBaseConfig:
                     self.__setattr__(variable, value)
             elif isinstance(value, int):
                 self.__setattr__(variable, value)
+            elif isinstance(value, bool):
+                self.__setattr__(variable, value)
             elif isinstance(value, list):
                 self.__setattr__(variable, value)
             elif isinstance(value, dict):
@@ -105,6 +107,8 @@ class PzProjectExcelSpreadsheetConfig(PzProjectBaseConfig):
     spreadsheet_folder: str | None
     sheet_name: str | None
     header_row: int | None
+    header_on_blank_try: int
+    page_mode: bool
     ignore_parenthesis: bool
     data_skip_row: int
     insert_row_after: int
@@ -117,8 +121,10 @@ class PzProjectExcelSpreadsheetConfig(PzProjectBaseConfig):
         self.ignore_parenthesis = False
         self.sheet_name = None
         self.header_row = None
+        self.header_on_blank_try = 0
         self.data_skip_row = 0
         self.insert_row_after = 0
+        self.page_mode = False
 
         super().__init__(variables)
         if 'additional_notes' in variables and isinstance(variables['additional_notes'], dict):
@@ -126,6 +132,10 @@ class PzProjectExcelSpreadsheetConfig(PzProjectBaseConfig):
 
         if 'ignore_parenthesis' in variables and isinstance(variables['ignore_parenthesis'], bool):
             self.ignore_parenthesis = variables['ignore_parenthesis']
+
+        # if 'header_on_blank_try' in variables:
+        #     if isinstance(variables['header_on_blank_try'], int):
+        #         self.header_on_blank_try = variables['header_on_blank_try']
 
 
 class PzProjectGraduationStandard:
@@ -186,6 +196,7 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
     signup_next_info: PzProjectExcelSpreadsheetConfig
     new_class_predefined_info: PzProjectExcelSpreadsheetConfig
     member_details_update: PzProjectExcelSpreadsheetConfig
+    meditation_activity_survey: PzProjectExcelSpreadsheetConfig
     post_lineup_template_folder: str
 
     def __init__(self, variables: dict[str, Any]) -> None:
@@ -202,7 +213,7 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
         # elif variable == 'new_class_senior':
         #     self.new_class_senior = PzProjectExcelSpreadsheetConfig(value)
         elif variable in ('questionnaire', 'new_class_senior', 'member_details_update',
-                          'signup_next_info', 'new_class_predefined_info'):
+                          'signup_next_info', 'new_class_predefined_info', 'meditation_activity_survey'):
             self.__setattr__(variable, PzProjectExcelSpreadsheetConfig(value))
         elif variable == 'templates':
             if isinstance(value, dict):

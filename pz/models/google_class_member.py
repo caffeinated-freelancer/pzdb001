@@ -37,6 +37,9 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
     deacon: str
     nextClasses: list[str]
 
+    # transit
+    recordOrder: int | None
+
     @classmethod
     def remap_variables(cls, new_mapping: dict[str, str | list[str]] | None):
         if new_mapping is not None:

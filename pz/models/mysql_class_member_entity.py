@@ -49,10 +49,14 @@ class MysqlClassMemberEntity(JSONClass):
         pass
 
     def __init__(self, columns: list[str], values: list[Any],
-                 google_member_detail: GoogleClassMemberModel | None = None) -> None:
+                 google_member_detail: GoogleClassMemberModel | None = None,
+                 another_entity: 'MysqlClassMemberEntity' = None) -> None:
         self.is_senior = False
 
-        if google_member_detail is None:
+        if another_entity is not None:
+            for k, v in another_entity.__dict__.items():
+                setattr(self, k, v)
+        elif google_member_detail is None:
             for i, column in enumerate(columns):
                 if column == 'updated_at':
                     self.updated_at = values[i].strftime('%Y-%m-%d %H:%M:%S')

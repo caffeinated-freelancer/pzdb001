@@ -2,23 +2,28 @@ import os
 from typing import Callable, Any
 
 from loguru import logger
+from openpyxl.cell import MergedCell
 from openpyxl.utils import get_column_letter
 
 from pz.config import PzProjectExcelSpreadsheetConfig
 from pz.models.excel_model import ExcelModelInterface
 from pz.models.text_with_properties import TextWithProperties
+from pz.utils import tuple_to_coordinate
 from services.excel_workbook_service import ExcelWorkbookService, PzCellProperties
 
 
 class ExcelTemplateService:
     service: ExcelWorkbookService
+    template: PzProjectExcelSpreadsheetConfig
     target_folder: str
     template_file: str
     destination_path: str
+    template_sheet_name: str
     headers: dict[str | int, int]
     header_row: int
     data_skip_row: int
     insert_row_after: int
+    page_mode: bool
 
     def __init__(self, model: ExcelModelInterface, template_spreadsheet: PzProjectExcelSpreadsheetConfig,
                  source_file_name: str, target_folder: str, output_filename_prefix: str,
@@ -26,6 +31,7 @@ class ExcelTemplateService:
         if not os.path.exists(target_folder):
             raise FileNotFoundError(target_folder)
 
+        self.template = template_spreadsheet
         self.template_file = template_spreadsheet.spreadsheet_file
         self.target_folder = target_folder
         self.data_skip_row = template_spreadsheet.data_skip_row
@@ -38,7 +44,11 @@ class ExcelTemplateService:
         # shutil.copyfile(template_file, destination_path)
 
         self.service = ExcelWorkbookService(model, self.template_file, header_at=template_spreadsheet.header_row,
+                                            header_on_blank_try=self.template.header_on_blank_try,
+                                            page_mode=self.template.page_mode,
                                             debug=debug)
+
+        self.page_mode = self.template.page_mode
         self.headers = self.service.get_headers()
         self.header_row = self.service.get_header_row()
         logger.debug(f'Headers: {self.headers}')
@@ -47,7 +57,7 @@ class ExcelTemplateService:
         return self.headers
 
     def rehash_header(self):
-        self.service.rehash_header()
+        self.service.rehash_header(header_on_blank_try=self.template.header_on_blank_try)
 
         self.headers = self.service.get_headers()
         self.header_row = self.service.get_header_row()
@@ -123,15 +133,21 @@ class ExcelTemplateService:
             for column in range(index, index + amount, 1):
                 self.service.set_cell_properties(row, column, template_cell)
 
+    def max_page_entries(self):
+        return self.service.page_max_row - self.service.header_row
+
     def write_data(self, suppliers,
                    caller: Any | None = None,
                    callback: Callable[[dict[str | int, str | int], Any, Any], tuple[Any, bool]] | None = None,
-                   duplicate_callback: Callable[[dict[str | int, str | int], Any, Any], bool] | None = None):
-        row_num = self.header_row + 1 + self.data_skip_row
+                   duplicate_callback: Callable[[dict[str | int, str | int], Any, Any], bool] | None = None,
+                   on_page: int = 0,
+                   save: bool = True):
+        sample_row_num = self.header_row + 1 + self.data_skip_row
+        row_num = sample_row_num + (self.service.sheet_max_row - self.service.header_row) * on_page
         counter = 0
 
         # fonts = [self.service.get_font(row_num, i) for i in range(1, len(self.headers), 1)]
-        template_cells = [PzCellProperties(self.service.get_cell(row_num + 1, i)) for i in
+        template_cells = [PzCellProperties(self.service.get_cell(sample_row_num + 1, i)) for i in
                           range(1, len(self.headers) + 1, 1)]
 
         header_template_cells = [PzCellProperties(self.service.get_cell(self.header_row, i)) for i in
@@ -141,8 +157,17 @@ class ExcelTemplateService:
 
         callback_data_holder = None
 
+        data_sn = 0
+
         for supplier in suppliers:
             datum = supplier()
+
+            data_sn += 1
+
+            if self.page_mode and data_sn > self.max_page_entries():
+                logger.error(f'資料超過頁面大小')
+                break
+
 
             if 0 < self.insert_row_after <= counter:
                 self.service.sheet.insert_rows(idx=row_num, amount=1)
@@ -169,33 +194,108 @@ class ExcelTemplateService:
                 if index <= len(template_cells):
                     self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])
 
-                if column_name in datum:
-                    value = datum[column_name]
-                    if isinstance(value, TextWithProperties):
-                        if 'color' in value.properties:
-                            self.service.write_cell(row_num, index, value.text, color=value.properties['color'])
-                        else:
-                            self.service.write_cell(row_num, index, value.text)
+                try:
+                    if column_name in datum:
+                        value = datum[column_name]
+
+                        try:
+                            if isinstance(value, TextWithProperties):
+                                if 'color' in value.properties:
+                                    self.service.write_cell(row_num, index, value.text, color=value.properties['color'])
+                                else:
+                                    self.service.write_cell(row_num, index, value.text)
+                            else:
+                                self.service.write_cell(row_num, index, value)
+                        except AttributeError as e:
+                            logger.warning(e)
+                        # print(row_num, self.data_skip_row)
+                        # print(index, len(template_cells))
                     else:
-                        self.service.write_cell(row_num, index, value)
-                    # print(row_num, self.data_skip_row)
-                    # print(index, len(template_cells))
-                else:
-                    self.service.write_cell(row_num, index, '')
-            self.service.set_row_dimensions(row_num, dimension)
-            row_num += 1
+                        self.service.write_cell(row_num, index, '')
+                except AttributeError as e:
+                    if self.page_mode:
+                        logger.warning(f'{row_num} vs {data_sn} vs {self.service.page_max_row} - {self.service.header_row}')
+                    raise e
+            if not self.page_mode:
+                self.service.set_row_dimensions(row_num, dimension)
             counter += 1
+            # logger.info(f'row: {row_num}: {counter} {self.service.page_max_row}')
+            row_num += 1
 
-        for r in range(row_num, self.service.max_row() + 1):
-            for column_name, index in self.headers.items():
-                self.service.write_cell(r, index, '')
-                self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])
-            self.service.set_row_dimensions(row_num, dimension)
+        if not self.page_mode:
+            for r in range(row_num, self.service.max_row() + 1):
+                for column_name, index in self.headers.items():
+                    self.service.write_cell(r, index, '')
+                    try:
+                        self.service.set_cell_properties_from_pz_cell(row_num, index, template_cells[index - 1])
+                    except IndexError as e:
+                        logger.warning(f"row: {row_num}, index: {index}, template size: {len(template_cells)}: {e}")
+                self.service.set_row_dimensions(row_num, dimension)
 
-        self.service.save_as(self.destination_path)
+        if save:
+            self.service.save_as(self.destination_path)
 
     def save_as(self, file_name: str | None = None):
         if file_name is not None:
             self.service.save_as(file_name)
         else:
             self.service.save_as(self.destination_path)
+
+    def sheet_rename(self, new_name: str):
+        self.service.sheet_rename(new_name)
+
+    def duplicate_sheet(self, source: str, target: str):
+        self.service.duplicate_sheet(source, target)
+        # new_sheet = workbook.copy_worksheet(sheet_to_duplicate)
+
+    def set_template_sheet(self, template_sheet_name):
+        self.template_sheet_name = template_sheet_name
+
+    def duplicate_page(self, page_no: int):
+        header_row = self.service.header_row
+        max_row = self.service.sheet_max_row
+        page_max_row = self.service.page_max_row
+
+        row_num = (max_row - header_row) * page_no + header_row + 1
+
+        self.add_page_break((max_row - header_row) * page_no + header_row)
+
+        i = 0
+        for row in range(header_row + 1, max_row + 1):
+            template_cells = [PzCellProperties(self.service.get_cell(row, x)) for x in
+                              range(1, len(self.headers) + 1, 1)]
+            dimension = self.service.get_row_dimensions(row)
+
+            # logger.info(f"duplicate from row: {row} to {row_num + i}")
+
+            merged_cell_from = 0
+
+            for x in range(1, len(self.headers) + 1, 1):
+                if x <= len(template_cells):
+                    self.service.set_cell_properties_from_pz_cell(row_num + i, x, template_cells[x - 1])
+                    if i >= page_max_row - header_row:
+                        cell = self.service.get_cell_from_default(row, x)
+                        value = cell.value
+                        if isinstance(cell, MergedCell):
+                            logger.trace(f"({row_num},{x}) MergedCell ({row},{x})")
+                            if merged_cell_from == 0:
+                                merged_cell_from = x - 1
+                        else:
+                            if merged_cell_from != 0:
+                                f = tuple_to_coordinate(row_num + i, merged_cell_from)
+                                t = tuple_to_coordinate(row_num + i, x - 1)
+                                self.service.sheet.merge_cells(f'{f}:{t}')
+                                merged_cell_from = 0
+
+                            if value is not None:
+                                logger.trace(f"({row_num},{x}) with {value} ({row},{x})")
+                                self.service.get_cell(row_num + i, x).value = value
+
+            self.service.set_row_dimensions(row_num + i, dimension)
+            i += 1
+
+    def set_active_sheet(self, sheet_name: str):
+        self.service.wb.active = self.service.wb[sheet_name]
+
+    def remove_sheet(self, sheet_name: str):
+        self.service.wb.remove(self.service.wb[sheet_name])

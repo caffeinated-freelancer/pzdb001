@@ -7,7 +7,7 @@ from typing import Any, Callable
 import openpyxl
 from loguru import logger
 from openpyxl import Workbook
-from openpyxl.cell import Cell
+from openpyxl.cell import Cell, MergedCell
 from openpyxl.styles import Font
 from openpyxl.utils import coordinate_to_tuple, get_column_letter
 from openpyxl.worksheet.dimensions import RowDimension, ColumnDimension
@@ -31,15 +31,21 @@ class ExcelWorkbookService:
     headers_rev: dict[Any, Any]
     max_column: int
     sheet: Worksheet | Any
+    default_sheet: Worksheet | Any
     debug: bool
     wb: Workbook | None
     header_row: int
     ignore_parenthesis: bool
     print_header: bool
     excel_file_name: str
+    default_sheet_title: str
+    page_max_row: int
+    sheet_max_row: int
 
     def __init__(self, model: ExcelModelInterface, excel_file: str, sheet_name: str | None = None,
-                 header_at: int | None = None, ignore_parenthesis: bool = False, debug: bool = False,
+                 header_at: int | None = None, header_on_blank_try: int = 0,
+                 page_mode: bool = False,
+                 ignore_parenthesis: bool = False, debug: bool = False,
                  print_header: bool = False, read_only: bool = False) -> None:
         self.ignore_parenthesis = ignore_parenthesis
         self.print_header = print_header
@@ -55,6 +61,11 @@ class ExcelWorkbookService:
         #     print(self.wb.worksheets)
         #     print(self.wb.sheetnames)
         self.sheet = self.wb[sheet_name] if sheet_name is not None else self.wb.active
+
+        logger.trace(f'Sheet Name: {self.sheet.title}')
+
+        self.default_sheet = self.sheet
+        self.default_sheet_title = self.sheet.title
 
         # self.sheet = self.wb.worksheets[sheet_name]
 
@@ -76,7 +87,17 @@ class ExcelWorkbookService:
 
         logger.debug(f'{excel_file}: {self.wb.sheetnames}/row:{self.header_row} - {self.wb.worksheets}')
 
-        self.rehash_header()
+        self.rehash_header(header_on_blank_try=header_on_blank_try)
+
+        if page_mode:
+            self.page_max_row = self.calculate_page()
+        else:
+            self.page_max_row = 0
+
+        self.sheet_max_row = self.sheet.max_row
+
+        logger.info(
+            f'header_row: {self.header_row}, page_max_row: {self.page_max_row}, sheet_max_row: {self.sheet_max_row}')
 
     def __del__(self):
         self.close()
@@ -93,7 +114,7 @@ class ExcelWorkbookService:
             # self.wb.close()
             self.wb = None
 
-    def rehash_header(self):
+    def rehash_header(self, header_on_blank_try: int = 0):
         self.headers = OrderedDict()
 
         self.headers_rev = {}
@@ -102,7 +123,14 @@ class ExcelWorkbookService:
         for colNum in range(1, self.sheet.max_column + 1, 1):
             cell = self.sheet.cell(self.header_row, colNum)
             value = cell.value
+
+            if value is None and header_on_blank_try > 0:
+                cell = self.sheet.cell(header_on_blank_try, colNum)
+                value = cell.value
+                # logger.warning(f'{colNum}: {value}')
+
             if value is not None:
+                # logger.warning(f'{colNum}: {value} ({header_on_blank_try})')
                 if isinstance(value, str):
                     value = cell.value.replace('\r', '').replace('\n', '')
                     value = value.strip()
@@ -126,6 +154,15 @@ class ExcelWorkbookService:
             for header in self.headers:
                 # print(header, self.headers[header])
                 print(f'\'\': \'{header}\',')
+
+    def calculate_page(self) -> int:
+        for rowNum in range(self.header_row + 1, self.sheet.max_row + 1):
+            for colNum in range(2, 5):
+                cell = self.sheet.cell(row=rowNum, column=colNum)
+                if isinstance(cell, MergedCell):
+                    logger.debug(f'Merged cell found at {rowNum},{colNum}')
+                    return rowNum - 1
+        return 0
 
     def read_row_by_row(self, callback: Callable[[int, list[Cell]], Any]):
         for rowNum in range(self.header_row + 1, self.sheet.max_row + 1):
@@ -184,6 +221,9 @@ class ExcelWorkbookService:
     def write_cell(self, row_num, col_num, value, color: str | None = None, font=None):
         cell = self.sheet.cell(row_num, col_num)
 
+        if isinstance(cell, MergedCell):
+            logger.warning(f'Merged cell({row_num},{col_num}): {cell}')
+
         if color is not None:
             current_font = cell.font
             # print(f'set color as {color}')
@@ -199,7 +239,12 @@ class ExcelWorkbookService:
         elif font is not None:
             cell.font = font
 
-        cell.value = value
+        try:
+            cell.value = value
+        except AttributeError as e:
+            logger.error(f'write_cell({row_num},{col_num}) = {value}: {e}')
+            raise e
+
 
     def get_font(self, row_num, col_num) -> Font:
         # col_num = col_num if col_num > 0 else 1
@@ -213,9 +258,13 @@ class ExcelWorkbookService:
                     shadow=font.shadow, strike=font.strike,
                     charset=font.charset, condense=font.condense)
 
-    def get_cell(self, row_num, col_num) -> Cell:
+    def get_cell(self, row_num, col_num) -> Cell | MergedCell:
         # col_num = col_num if col_num > 0 else 1
         return self.sheet.cell(row_num, col_num)
+
+    def get_cell_from_default(self, row_num, col_num) -> Cell | MergedCell:
+        # col_num = col_num if col_num > 0 else 1
+        return self.default_sheet.cell(row_num, col_num)
 
     def set_cell_properties(self, row_num, col_num, another_cell: Cell):
         cell = self.sheet.cell(row_num, col_num)
@@ -234,10 +283,14 @@ class ExcelWorkbookService:
         cell.fill = copy(pz_cell.fill)
 
     def get_row_dimensions(self, row_num) -> RowDimension:
-        return self.sheet.row_dimensions[row_num]
+        dimension = self.sheet.row_dimensions[row_num]
+        return dimension
 
-    def set_row_dimensions(self, row_num, value: RowDimension):
-        self.sheet.row_dimensions[row_num].height = value.height
+    def set_row_dimensions(self, row_num, dimension: RowDimension):
+        # self.sheet.row_dimensions[row_num].height = value.height
+        if dimension.customHeight:
+            self.sheet.row_dimensions[row_num].height = dimension.height
+            # logger.trace(f"row {row_num} height: {dimension.height}, {self.sheet.row_dimensions[row_num].customHeight}")
         # self.sheet.row_dimensions[row_num].alignment = value.alignment
 
     def get_column_dimension(self, col_num) -> ColumnDimension:
@@ -271,3 +324,17 @@ class ExcelWorkbookService:
     def save_as(self, filename: str):
         logger.info(f'Save excel workbook as: {filename}')
         self.wb.save(filename)
+
+    def sheet_rename(self, new_name: str):
+        self.sheet.title = new_name
+
+    def duplicate_sheet(self, source: str, target: str):
+        source_sheet = self.wb[source]
+        new_sheet = self.wb.copy_worksheet(source_sheet)
+        new_sheet.title = target
+        # new_sheet.print_titles = source_sheet.print_titles
+        # new_sheet.print_titles(source_sheet.print_titles)
+        new_sheet.print_title_rows = source_sheet.print_title_rows
+        new_sheet.print_title_cols = source_sheet.print_title_cols
+
+        self.sheet = new_sheet
