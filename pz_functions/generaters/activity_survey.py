@@ -10,6 +10,20 @@ from services.grand_member_service import PzGrandMemberService
 from services.senior_deacon_service import SeniorDeaconService
 
 
+def flush_page(template: ExcelTemplateService, template_sheet_name: str, page_no: int, class_name: str, group_id: int, class_members: list[dict[str, Any]]):
+    if len(class_members) > 0:
+        logger.info(f'write {class_name}/{group_id} page: {page_no}, records: {len(class_members)}')
+
+        if page_no == 0:
+            template.duplicate_sheet(template_sheet_name, class_name)
+        else:
+            template.duplicate_page(page_no)
+
+
+        supplier = (lambda y=x: x for x in class_members)
+        template.write_data(supplier, on_page=page_no, save=False)
+
+
 def activity_survey(cfg: PzProjectConfig):
     activity_survey_config = cfg.excel.meditation_activity_survey
 
@@ -56,29 +70,35 @@ def activity_survey(cfg: PzProjectConfig):
         first_sheet_name = None
 
         for class_name in cfg.meditation_class_names:
-            class_members = []
+            class_members: list[dict[str, Any]] = []
             number = 0
             group_id = -1
             page_no = 0
             page_entries = 0
 
             for member in all_members:
-                if member.class_name == class_name:
+                if member.class_name != class_name:
+                    if len(class_members) > 0:
+                        flush_page(template, template_sheet_name, page_no, class_name, group_id, class_members)
+                        class_members.clear()
+                else:
                     entry: dict[str, Any] = {}
                     # print(f'{member.class_name} {member.class_group} {member.student_id} {member.real_name} {member.dharma_name}')
 
                     if member.class_group != group_id:
+                        logger.warning(f'{class_name} {member.class_group}')
                         if len(class_members) > 0:
                             number = 0
                             if page_no == 0:
-                                template.duplicate_sheet(template_sheet_name, class_name)
+                                # template.duplicate_sheet(template_sheet_name, class_name)
                                 if first_sheet_name is None:
                                     first_sheet_name = class_name
-                            else:
-                                template.duplicate_page(page_no)
+                            # else:
+                                # template.duplicate_page(page_no)
 
-                            supplier = (lambda y=x: x for x in class_members)
-                            template.write_data(supplier, on_page=page_no, save=False)
+                            flush_page(template, template_sheet_name, page_no, class_name, group_id, class_members)
+                            # supplier = (lambda y=x: x for x in class_members)
+                            # template.write_data(supplier, on_page=page_no, save=False)
                             page_no += 1
 
                         group_id = member.class_group
@@ -89,9 +109,10 @@ def activity_survey(cfg: PzProjectConfig):
                     page_entries += 1
 
                     if page_entries > max_page_entries:
-                        template.duplicate_page(page_no)
-                        supplier = (lambda y=x: x for x in class_members)
-                        template.write_data(supplier, on_page=page_no, save=False)
+                        flush_page(template, template_sheet_name, page_no, class_name, group_id, class_members)
+                        # template.duplicate_page(page_no)
+                        # supplier = (lambda y=x: x for x in class_members)
+                        # template.write_data(supplier, on_page=page_no, save=False)
                         class_members.clear()
                         page_no += 1
                         page_entries = 1
@@ -112,6 +133,9 @@ def activity_survey(cfg: PzProjectConfig):
                     else:
                         entry[dharma_protector_header] = None
                     class_members.append(entry)
+
+            flush_page(template, template_sheet_name, page_no, class_name, group_id, class_members)
+            class_members.clear()
 
         template.remove_sheet(template_sheet_name)
         template.set_active_sheet(first_sheet_name)
