@@ -174,6 +174,7 @@ class AttendRecordAsClassMemberService:
             key = f'{model.className}_{model.classGroup}_{model.fullName}_{model.dharmaName}'
             if key in deacon_service.senior_deacons:
                 entry = deacon_service.senior_deacons.pop(key)
+
                 if entry.deacon is not None and entry.deacon != '':
                     model.deacon = entry.deacon
                 elif entry.senior is not None and entry.senior != '':
@@ -183,8 +184,10 @@ class AttendRecordAsClassMemberService:
             if key in deacon_service.class_senior:
                 model.senior = deacon_service.class_senior[key].fullName
 
-        for k, v in deacon_service.senior_deacons:
-            logger.warning(f'{k}: {v.fullName}')
+        logger.info(deacon_service.senior_deacons)
+
+        for k in deacon_service.senior_deacons.keys():
+            logger.warning(f'{k}: {deacon_service.senior_deacons[k].fullName} 學長沒有在上課記錄')
 
         sorted_list = sorted(models, key=functools.cmp_to_key(
             lambda a, b: comparator(a, b, self.config.meditation_class_names)))

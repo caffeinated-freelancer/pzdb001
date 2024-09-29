@@ -5,7 +5,7 @@ from typing import Callable
 from loguru import logger
 
 from pz.cloud.spreadsheet_member_service import PzCloudSpreadsheetMemberService
-from pz.comparators import deacon_based_class_member_comparator, deacon_based_class_member_comparator_for_tuple
+from pz.comparators import deacon_based_class_member_comparator, deacon_based_class_member_comparator_for_vlookup_tuple
 from pz.config import PzProjectConfig, PzProjectGoogleSpreadsheetConfig
 from pz.models.google_class_member import GoogleClassMemberModel
 from pz.models.member_in_access import MemberInAccessDB
@@ -84,6 +84,7 @@ class PzGrandMemberService:
         for entity in self.all_class_members:
             if entity.real_name in self.class_members_by_name:
                 self.class_members_by_name[entity.real_name].append(entity)
+                # logger.warning(f'{entity.real_name} in {[ x.class_name for x in self.class_members_by_name[entity.real_name]]}')
             else:
                 self.class_members_by_name[entity.real_name] = [entity]
 
@@ -163,10 +164,11 @@ class PzGrandMemberService:
         match_list = self.find_class_member_by_name(real_name)
 
         if len(match_list) > 1 and dharma_name != '':
+            matched_members = []
             for member in match_list:
                 if member.dharma_name == dharma_name:
-                    return [member]
-            return []
+                    matched_members.append(member)
+            return matched_members
 
         return match_list
 
@@ -322,7 +324,12 @@ class PzGrandMemberService:
                 } 個學員符合: {[f'{x[1].student_id}/{x[1].dharma_name if x[1].dharma_name is not None else ''
                 }/{x[1].class_name}/{x[1].class_group}' for x in student_ids.values()]}')
             # sorted_list = sorted(results, key=class_member_comparator)
-            sorted_list = sorted(results, key=functools.cmp_to_key(deacon_based_class_member_comparator_for_tuple))
+
+            sorted_list = sorted(results, key=functools.cmp_to_key(deacon_based_class_member_comparator_for_vlookup_tuple))
+            logger.trace(
+                f'{sorted_list[0][1].real_name}/{sorted_list[0][1].dharma_name} {sorted_list[0][1].is_senior} pick {sorted_list[0][1].class_name} in {[
+                    x[1].class_name for x in sorted_list
+                ]}')
             return sorted_list[0]
         else:
             return None
@@ -361,6 +368,9 @@ class PzGrandMemberService:
         results: list[tuple[MysqlMemberDetailEntity, MysqlClassMemberEntity]] = self.find_grand_member_by_pz_name(
             full_name, debug=debug)
 
+        # if len(results) > 1:
+        #     logger.warning(f'{full_name} : {len(results)}')
+
         warnings: list[str] = []
 
         have_reduced = False
@@ -385,6 +395,10 @@ class PzGrandMemberService:
                 warnings.append(
                     f'{full_name} 同名同姓有 {len(results)} 人, 系統挑選的不一定是正確的, 試著指定法名 {[f'{x[1].student_id}/{x[1].dharma_name}/{x[1].class_name}/{x[1].class_group}' for x in results]}')
             break
+
+        # if len(results) > 1:
+        #     logger.trace(
+        #         f'{full_name}/{results[0][1].dharma_name} : {len(results)} [{[x[1].class_name for x in results]}] [{results[0][1].deacon}] [{results[0][1].is_senior}][{results[0][1].some_kind_of_senior}]')
 
         return self.perform_find_grand_one(results, dharma_name=dharma_name), warnings
 

@@ -121,7 +121,7 @@ class MySqlImportAndFetchingService:
     def _create_the_checkin_member_only_view(self):
         query = f"""
         CREATE OR REPLACE VIEW view_member_only_for_checkin AS 
-        SELECT d.student_id,d.real_name,d.dharma_name,c.class_name,c.class_group,d.gender,d.birthday,d.mobile_phone 
+        SELECT d.student_id,d.real_name,d.dharma_name,c.class_name,c.class_group,d.gender,d.personal_id,d.mobile_phone 
         FROM member_details d
         LEFT JOIN {self.current_table} c USING (student_id)
         ORDER BY c.class_name,c.class_group,d.student_id
@@ -135,7 +135,7 @@ class MySqlImportAndFetchingService:
     def _create_the_checkin_class_member_view(self):
         query = f"""
         CREATE OR REPLACE VIEW view_class_member_for_checkin AS 
-        SELECT c.student_id,c.real_name,c.dharma_name,c.class_name,c.class_group,c.gender,d.birthday,d.mobile_phone 
+        SELECT c.student_id,c.real_name,c.dharma_name,c.class_name,c.class_group,c.gender,d.personal_id,d.mobile_phone 
         FROM {self.current_table} c 
         LEFT JOIN member_details d USING (student_id) ORDER BY class_name,class_group
         """

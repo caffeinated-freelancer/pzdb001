@@ -13,7 +13,8 @@ class ClassMemberForCheckinModel(ExcelCreationModelInterface):
         'class_name': '班級',
         'class_group': '組別',
         'gender': '性別',
-        'birthday': '生日末四碼',
+        # 'birthday': '生日末四碼',
+        'personal_id': '生日末四碼', # 改用身分證號末四碼
         'mobile_phone': '電話末四碼',
     }
 
@@ -24,6 +25,7 @@ class ClassMemberForCheckinModel(ExcelCreationModelInterface):
     class_group: str
     gender: str
     birthday: str
+    personal_id: str
     mobile_phone: str
 
     def __init__(self, columns: list[str], values: list[Any]) -> None:
@@ -36,6 +38,12 @@ class ClassMemberForCheckinModel(ExcelCreationModelInterface):
                     matched = re.match(r'^\d{4}-(\d{2})-(\d{2})$', value)
                     if matched:
                         setattr(self, column, f'{matched.group(1)}{matched.group(2)}')
+                    else:
+                        setattr(self, column, None)
+                elif column == 'personal_id':
+                    matched = re.match(r'.*(\d{4})$', value)
+                    if matched:
+                        setattr(self, column, matched.group(1))
                     else:
                         setattr(self, column, None)
                 elif column == 'mobile_phone':
