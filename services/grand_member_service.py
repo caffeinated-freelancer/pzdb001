@@ -12,7 +12,9 @@ from pz.models.member_in_access import MemberInAccessDB
 from pz.models.member_with_detail import MemberWithDetail
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
+from pz.models.new_class_senior import NewClassSeniorModel
 from pz.models.pz_class import PzClass
+from pz.models.special_deacon import SpecialDeacon
 from pz.utils import full_name_to_names, names_to_pz_full_name
 from services.access_db_service import AccessDbService
 from services.member_merging_service import MemberMergingService
@@ -28,13 +30,15 @@ class PzGrandMemberService:
     class_members_by_student_id: dict[int, list[MysqlClassMemberEntity]]
     all_classes: OrderedDict[str, PzClass]
     deacon_members_by_name: OrderedDict[str, list[MysqlClassMemberEntity]]
+    special_deacons: dict[str, SpecialDeacon]
     senior_by_student_id: dict[int, MysqlClassMemberEntity]
     senior_by_class_and_group: dict[str, MysqlClassMemberEntity]
     all_seniors: list[MysqlClassMemberEntity]
     all_class_members: list[MysqlClassMemberEntity]
 
     def __init__(self, config: PzProjectConfig, from_access: bool = False, from_google: bool = False,
-                 all_via_access_db: bool = False):
+                 all_via_access_db: bool = False,
+                 deacons: list[NewClassSeniorModel] | None = None):
         self.config = config
 
         if all_via_access_db:
@@ -43,6 +47,24 @@ class PzGrandMemberService:
             self.mysql_service = MySqlImportAndFetchingService(self.config)
 
         self.senior_by_class_and_group = {}
+        self.special_deacons = {}
+
+        if deacons is not None:
+            for m in deacons:
+                key = self.deacon_key(m.className, m.groupId, m.fullName, m.dharmaName)
+                order = len(config.deacon_order) + 1000
+                title = ''
+                if m.deacon in config.deacon_order:
+                    order = config.deacon_order.index(m.deacon) + 1
+                    title = m.deacon
+                if m.senior in config.deacon_order:
+                    order2 = config.deacon_order.index(m.senior) + 1
+                    if order2 < order:
+                        order = order2
+                        title = m.senior
+
+                if order <= len(config.deacon_order):
+                    self.special_deacons[key] = SpecialDeacon(m, title, order)
 
         if from_google:
             self.init_class_members(self.read_class_members_from_google)
@@ -82,6 +104,12 @@ class PzGrandMemberService:
         self.all_class_members = fetching_function()
 
         for entity in self.all_class_members:
+            key = self.deacon_key(entity.class_name, int(entity.class_group), entity.real_name, entity.dharma_name)
+
+            if key in self.special_deacons:
+                entity.special_deacon = self.special_deacons[key]
+                logger.info(f'{entity.class_name}/{entity.class_group}/{entity.real_name}/{entity.dharma_name}: {entity.special_deacon.title} {entity.special_deacon.order}')
+
             if entity.real_name in self.class_members_by_name:
                 self.class_members_by_name[entity.real_name].append(entity)
                 # logger.warning(f'{entity.real_name} in {[ x.class_name for x in self.class_members_by_name[entity.real_name]]}')
@@ -138,6 +166,10 @@ class PzGrandMemberService:
                     else:
                         logger.warning(
                             f'Warning! Senior {pz_class_group.seniorName} not found ({pz_class.pzClassName} / {group_id})')
+
+    @staticmethod
+    def deacon_key(class_name: str, group_id: int, real_name: str, dharma_name: str) -> str:
+        return f'{class_name}_{group_id}_{real_name}_{dharma_name if dharma_name is not None else ""}'
 
     def find_member_details_by_name(self, name: str) -> list[MysqlMemberDetailEntity]:
         found = self.member_details_by_name.get(name)
@@ -325,7 +357,8 @@ class PzGrandMemberService:
                 }/{x[1].class_name}/{x[1].class_group}' for x in student_ids.values()]}')
             # sorted_list = sorted(results, key=class_member_comparator)
 
-            sorted_list = sorted(results, key=functools.cmp_to_key(deacon_based_class_member_comparator_for_vlookup_tuple))
+            sorted_list = sorted(results,
+                                 key=functools.cmp_to_key(deacon_based_class_member_comparator_for_vlookup_tuple))
             logger.trace(
                 f'{sorted_list[0][1].real_name}/{sorted_list[0][1].dharma_name} {sorted_list[0][1].is_senior} pick {sorted_list[0][1].class_name} in {[
                     x[1].class_name for x in sorted_list

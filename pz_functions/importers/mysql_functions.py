@@ -7,6 +7,7 @@ from services.access_db_migration import AccessDBMigration
 from services.grand_member_service import PzGrandMemberService
 from services.member_merging_service import MemberMergingService
 from services.mysql_import_and_fetching import MySqlImportAndFetchingService
+from services.new_class_senior_service import NewClassSeniorService
 
 
 def write_access_to_mysql(cfg: PzProjectConfig) -> int:
@@ -41,7 +42,7 @@ def handle_lookup(gms: PzGrandMemberService, entry: GoogleMemberRelation) -> Ver
 
 
 def write_google_relation_to_mysql(cfg: PzProjectConfig) -> tuple[int, list[GeneralProcessingError]]:
-    gms = PzGrandMemberService(cfg)
+    gms = PzGrandMemberService(cfg, deacons=NewClassSeniorService.read_all_seniors(cfg))
     mysql_import_and_fetching = MySqlImportAndFetchingService(cfg)
 
     return mysql_import_and_fetching.google_relation_to_mysql(lambda x: handle_lookup(gms, x))

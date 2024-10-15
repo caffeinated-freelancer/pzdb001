@@ -239,6 +239,7 @@ class PzProjectConfig(PzProjectBaseConfig):
     debug_text_file_output: str
     logging: PzProjectLoggingConfig
     meditation_class_names: list[str]
+    deacon_order: list[str]
 
     def __init__(self, filename: str, variables: dict[str, Any]) -> None:
         self.config_filename = filename

@@ -33,6 +33,14 @@ meditation_class_names:
   - "日研"
   - "夜研"
 
+deacon_order:
+  - "總學長"
+  - "班務副總"
+  - "法務副總"
+  - "課務副總"
+  - "學長"
+  - "副學長"
+
 # MySQL 資料庫連線設定
 mysql:
   user: 'database_user'

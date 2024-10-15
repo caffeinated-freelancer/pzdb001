@@ -1,4 +1,4 @@
-import win32com.client
+# import win32com.client
 
 
 def get_usb_info():

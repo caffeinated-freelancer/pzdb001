@@ -3,6 +3,7 @@ from typing import Any
 
 from .google_class_member import GoogleClassMemberModel
 from .json_class import JSONClass
+from .special_deacon import SpecialDeacon
 
 
 class MysqlClassMemberEntity(JSONClass):
@@ -17,8 +18,10 @@ class MysqlClassMemberEntity(JSONClass):
     gender: str
     next_classes: str
     updated_at: str
+
     is_senior: bool
     some_kind_of_senior: bool
+    special_deacon: SpecialDeacon | None
     signupClasses: list[str]
 
     VARIABLE_MAP = {
@@ -52,6 +55,7 @@ class MysqlClassMemberEntity(JSONClass):
                  google_member_detail: GoogleClassMemberModel | None = None,
                  another_entity: 'MysqlClassMemberEntity' = None) -> None:
         self.is_senior = False
+        self.special_deacon = None
 
         if another_entity is not None:
             for k, v in another_entity.__dict__.items():

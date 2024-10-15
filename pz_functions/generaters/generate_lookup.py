@@ -11,6 +11,7 @@ from pz.models.vlookup_model import VLookUpModel
 from pz.utils import full_name_to_names, get_formatted_datetime
 from services.excel_workbook_service import ExcelWorkbookService
 from services.grand_member_service import PzGrandMemberService
+from services.new_class_senior_service import NewClassSeniorService
 
 
 class VLookUpGenerator:
@@ -31,7 +32,8 @@ class VLookUpGenerator:
         model = VLookUpModel({})
         self.service = ExcelWorkbookService(model, filename, header_at=1)
         self.member_service = PzGrandMemberService(
-            cfg, from_access=False, from_google=False, all_via_access_db=via_access)
+            cfg, from_access=False, from_google=False, all_via_access_db=via_access,
+            deacons=NewClassSeniorService.read_all_seniors(cfg))
 
         self.dataIndexes: dict[str, int] = {}
         self.studentIdIndex = -1
