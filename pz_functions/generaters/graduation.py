@@ -154,6 +154,9 @@ def generate_graduation_report(cfg: PzProjectConfig, spreadsheet_cfg: PzProjectE
                 'M': 0,  # 補課
                 'L': 0,  # 遲到
                 'E': 0,  # 早退
+                'ML': 0, # 靜坐補課 [當出席]
+                'LL': 0, # 靜坐遲到
+                'S1': 0, # 特殊 1 (回山護持本山各類禪七活動) [當補課]
                 '_': 0,  # 空白/無資料
             }
 
@@ -195,8 +198,9 @@ def generate_graduation_report(cfg: PzProjectConfig, spreadsheet_cfg: PzProjectE
                     else:
                         datum[date2index[day]] = ''
             # '出席V': 31, '遲到L': 32, '補課M': 33, '請假O': 34, '放香F': 35, '曠課A': 36, '全勤': 37, '勤學': 38, '結業': 39
-            datum['出席V'] = attend_counters['V']
+            datum['出席V'] = attend_counters['V'] + attend_counters['ML']
             datum['遲到L'] = attend_counters['L']
+            datum['靜坐遲到LL'] = attend_counters['LL']
             datum['補課M'] = attend_counters['M']
             datum['請假O'] = attend_counters['O']
             datum['放香F'] = attend_counters['F']
@@ -222,7 +226,7 @@ def generate_graduation_report(cfg: PzProjectConfig, spreadsheet_cfg: PzProjectE
 
             if days_left > 0 and graduation_standard is not None:
                 if graduation_standard.calculate(attend_counters):
-                    datum['結業'] = 'V'
+                    datum['結業'] = notes['圓滿結業'] if '圓滿結業' in notes else 'V'
                 else:
                     saved = attend_counters
                     attend_counters['V'] += days_left
@@ -231,20 +235,24 @@ def generate_graduation_report(cfg: PzProjectConfig, spreadsheet_cfg: PzProjectE
                     else:
                         attend_counters = saved
 
-                        make_up = attend_counters['O'] + attend_counters['A'] + attend_counters['_']
+                        make_up = attend_counters['O'] + attend_counters['A'] + attend_counters['_'] + attend_counters['LL']
                         m_org = attend_counters['M']
                         attend_counters['M'] += make_up
                         attend_counters['A'] = 0
                         attend_counters['O'] = 0
                         attend_counters['_'] = 0
+                        attend_counters['LL'] = 0
                         if graduation_standard.calculate(attend_counters):
-                            for i in range(1, m_org + 1):
+                            for i in range(1, make_up + 1):
                                 attend_counters['M'] = m_org + i
                                 attend_counters['O'] = make_up - i
                                 if graduation_standard.calculate(attend_counters):
                                     m = graduation_warning.replace("{{m}}", str(i))
                                     datum['結業'] = TextWithProperties(m, {'color': 'FF0000'})
                                     break
+                        else:
+                            text = notes['缺課過多'] if '缺課過多' in notes else ''
+                            datum['結業'] = TextWithProperties(text, {'color': 'FF0000'})
                     attend_counters = saved
             else:
                 if graduation_standard is not None:
@@ -253,10 +261,10 @@ def generate_graduation_report(cfg: PzProjectConfig, spreadsheet_cfg: PzProjectE
                         graduated = True
 
                 if attend_counters['V'] == number_of_weeks:
-                    datum['全勤'] = '全勤'
+                    datum['全勤'] = notes['全勤'] if '全勤' in notes else '全勤'
                 elif not graduated and attend_counters['V'] + attend_counters['L'] + attend_counters[
                     'M'] == number_of_weeks:
-                    datum['勤學'] = '勤學'
+                    datum['勤學'] = notes['勤學'] if '勤學' in notes else '勤學'
 
         supplier = (lambda y=x: x for x in data)
         template_service.write_data(supplier, callback=lambda x, y, z: add_page_break(x, y))

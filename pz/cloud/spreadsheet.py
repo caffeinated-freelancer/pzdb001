@@ -193,6 +193,7 @@ class SpreadsheetRangeInfo:
             # self.indexes = [x for x in [safe_index(headers, col_name, -1) for col_name in col_names] if x >= 0]
         # my_list[::-1].index(element_to_find)
         # len(my_list) - 1 - last_occurrence_index
+        logger.info(headers)
 
         self.starting_row = h_row + 1
         self.ending_row = spreadsheet.rowCount - 1

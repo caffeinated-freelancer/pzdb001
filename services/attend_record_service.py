@@ -190,12 +190,12 @@ class AttendRecordAsClassMemberService:
             logger.warning(f'{k}: {deacon_service.senior_deacons[k].fullName} 學長沒有在上課記錄')
 
         sorted_list = sorted(models, key=functools.cmp_to_key(
-            lambda a, b: comparator(a, b, self.config.meditation_class_names)))
+            lambda a, b: trivial_comparator(a, b, self.config.meditation_class_names)))
 
         return sorted_list
 
 
-def comparator(a: GoogleClassMemberModel, b: GoogleClassMemberModel, class_names: list[str]) -> int:
+def senior_first_comparator(a: GoogleClassMemberModel, b: GoogleClassMemberModel, class_names: list[str]) -> int:
     if a.className == b.className:
         if a.classGroup == b.classGroup:
             if a.senior == a.fullName:
@@ -208,6 +208,19 @@ def comparator(a: GoogleClassMemberModel, b: GoogleClassMemberModel, class_names
                 else:
                     return -1
             elif b.deacon is not None and b.deacon != '':
+                return 1
+            return a.recordOrder - b.recordOrder
+        else:
+            return int(a.classGroup) - int(b.classGroup)
+    else:
+        return class_names.index(a.className) - class_names.index(b.className)
+
+def trivial_comparator(a: GoogleClassMemberModel, b: GoogleClassMemberModel, class_names: list[str]) -> int:
+    if a.className == b.className:
+        if a.classGroup == b.classGroup:
+            if a.senior == a.fullName:
+                return -1
+            elif b.senior == b.fullName:
                 return 1
             return a.recordOrder - b.recordOrder
         else:

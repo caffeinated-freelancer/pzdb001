@@ -151,8 +151,10 @@ class PzProjectGraduationStandard:
     def calculate(self, counters: dict[str, int]) -> bool:
         graduate = True
         for expression in self.expressions:
-            for key, value in counters.items():
-                expression = expression.replace(key, str(value))
+            for key_length in range(2, 0, -1):
+                for key, value in counters.items():
+                    if len(key) == key_length:
+                        expression = expression.replace(key, str(value))
             graduate = graduate and eval(expression)
         return graduate
 
