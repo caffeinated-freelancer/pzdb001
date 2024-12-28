@@ -21,6 +21,7 @@ from pz_functions.importers.member_details_update import member_details_update
 from pz_functions.importers.mysql_functions import write_access_to_mysql, write_google_to_mysql
 from pz_functions.mergers.member_merging import member_data_merging
 from services.excel_workbook_service import ExcelWorkbookService
+from services.qrcode_service import QRCodeService
 from ui.windows_gui import PyPzWindows
 
 
@@ -132,6 +133,8 @@ if __name__ == '__main__':
             print(f"Unknown option: {opt}")
             sys.exit(2)
 
+
+
     cfg = PzProjectConfig.from_yaml(config_file)
 
     cfg.make_sure_output_folder_exists()
@@ -139,6 +142,10 @@ if __name__ == '__main__':
         handlers=[{"sink": sys.stderr, "level": cfg.logging.level}],  # Change 'WARNING' to your desired level
     )
     logger.add(cfg.logging.log_file, level=cfg.logging.level, format=cfg.logging.format)
+
+    # qrcode_svc = QRCodeService(cfg)
+    # qrcode_svc.create_qrcode('113022085', '芊小伊')
+    # exit(0)
 
     if write_access_to_mysql_flag:
         logger.info("Writing MS Access to MySQL database ...")

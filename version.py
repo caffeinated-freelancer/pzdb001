@@ -1,1 +1,1 @@
-__pz_version__ = '1.5.5'
+__pz_version__ = '1.6.0'

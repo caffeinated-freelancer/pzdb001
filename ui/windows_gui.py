@@ -2,11 +2,12 @@ import os
 import subprocess
 import sys
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QAction
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
-    QPushButton, QVBoxLayout, QGridLayout, QLabel, )
+    QPushButton, QVBoxLayout, QGridLayout, QLabel, QFileDialog, QProgressDialog, )
 from loguru import logger
 
 from pz.config import PzProjectConfig
@@ -16,11 +17,13 @@ from pz_functions.generaters.activity_survey import activity_survey
 from pz_functions.generaters.graduation import generate_graduation_reports
 from pz_functions.generaters.introducer import generate_introducer_reports
 from pz_functions.generaters.member_comparison import generate_member_comparison_table
+from pz_functions.generaters.qrcode import QRCodeGeneratrUiService
 from pz_functions.importers.mysql_functions import write_google_relation_to_mysql
 from ui.access_db_dialog import AccessDatabaseDialog
 from ui.checkin_system_dialog import CheckinSystemDialog
 from ui.cloud_upload_dialog import CloudUploadDialog
 from ui.config_holder import ConfigHolder
+from ui.general_ui_worker import GeneralUiWorker
 from ui.member_import_dialog import MemberImportDialog
 from ui.pilgrimage_dialog import PilgrimageDialog
 from ui.processing_done_dialog import ProcessingDoneDialog
@@ -53,6 +56,8 @@ class PyPzWindows(QMainWindow):
     pzCentralLayout: QVBoxLayout
     pzCentralWidget: QWidget
     cloudUploadDialog: CloudUploadDialog
+    progressBar: QProgressDialog | None
+    generalUiWorker: GeneralUiWorker | None
 
     def __init__(self, cfg: PzProjectConfig):
         super().__init__()
@@ -63,6 +68,8 @@ class PyPzWindows(QMainWindow):
         self.setFixedSize(880, 520)
 
         self.pzCentralLayout = QVBoxLayout()
+        self.progressBar = None
+        self.generalUiWorker = None
 
         # self.create_menu()
         # self.pzCentralWidget = QWidget(self)
@@ -375,6 +382,34 @@ class PyPzWindows(QMainWindow):
         except Exception as e:
             self.uiCommons.show_error_dialog(e)
 
+    # def open_output_folder(self):
+    #     os.startfile(self.configHolder.get_config().output_folder)
+
+    def close_progress_bar(self):
+        self.progressBar.close()
+        self.progressBar = None
+        self.open_output_folder()
+
+    def generate_qrcode(self):
+        try:
+            file_name, _ = QFileDialog.getOpenFileName(self, "開啟檔案", "", "Excel 檔案 (*.xlsx);; 所有檔案 (*)")
+            if file_name:
+                svc = QRCodeGeneratrUiService(self.configHolder.get_config(), file_name)
+
+                self.progressBar = QProgressDialog("QR Code 產生中", None, 0, 0)
+                self.progressBar.setWindowTitle("產生 QR Code")
+                self.progressBar.setFont(self.uiCommons.font16)
+                self.progressBar.setWindowModality(Qt.WindowModality.NonModal)
+                self.progressBar.show()
+
+                self.generalUiWorker = GeneralUiWorker(svc, self.progressBar)
+                self.generalUiWorker.finished.connect(self.close_progress_bar)
+                self.generalUiWorker.start()
+                # generate_qrcode(self.configHolder.get_config(), file_name)
+        except Exception as e:
+            self.uiCommons.show_error_dialog(e)
+            logger.error(e)
+
     def create_simple_function_buttons(self):
         buttons_and_functions = [
             [
@@ -384,6 +419,9 @@ class PyPzWindows(QMainWindow):
             [
                 (f'📝 禪修活動調查', self.meditation_activity_survey),
                 ('📁 禪修活動資料夾', self.open_activity_survey_folder),
+            ],
+            [
+                (f'💳 福慧卡製作', self.generate_qrcode),
             ],
             [
                 ('🔼 切換成完整版', self.change_to_full_layout),

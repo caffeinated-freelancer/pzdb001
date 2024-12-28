@@ -226,6 +226,21 @@ class PzProjectExcelConfig(PzProjectBaseConfig):
         return True
 
 
+class PzProjectQrCodeConfig(PzProjectBaseConfig):
+    template_file: str
+    font_ttf: str
+    qrcode_box: int
+    qrcode_border: int
+    qrcode_y_axis: int
+    text_y_axis: int
+    id_coordinate: str
+    text_size: int
+    id_size: int
+
+    def __init__(self, variables: dict[str, Any]) -> None:
+        super().__init__(variables)
+
+
 class PzProjectConfig(PzProjectBaseConfig):
     config_filename: str
     version: str
@@ -242,6 +257,7 @@ class PzProjectConfig(PzProjectBaseConfig):
     logging: PzProjectLoggingConfig
     meditation_class_names: list[str]
     deacon_order: list[str]
+    qrcode: PzProjectQrCodeConfig
 
     def __init__(self, filename: str, variables: dict[str, Any]) -> None:
         self.config_filename = filename
@@ -287,6 +303,8 @@ class PzProjectConfig(PzProjectBaseConfig):
             self.excel = PzProjectExcelConfig(value)
         elif variable == 'logging':
             self.logging = PzProjectLoggingConfig(value)
+        elif variable == 'qrcode':
+            self.qrcode = PzProjectQrCodeConfig(value)
         else:
             return False
         return True
