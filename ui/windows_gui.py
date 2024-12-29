@@ -390,6 +390,9 @@ class PyPzWindows(QMainWindow):
         self.progressBar = None
         self.open_output_folder()
 
+    def show_qrcode_template(self):
+        os.startfile(self.configHolder.get_config().qrcode.template_file)
+
     def generate_qrcode(self):
         try:
             file_name, _ = QFileDialog.getOpenFileName(self, "開啟檔案", "", "Excel 檔案 (*.xlsx);; 所有檔案 (*)")
@@ -399,7 +402,7 @@ class PyPzWindows(QMainWindow):
                 self.progressBar = QProgressDialog("QR Code 產生中", None, 0, 0)
                 self.progressBar.setWindowTitle("產生 QR Code")
                 self.progressBar.setFont(self.uiCommons.font16)
-                self.progressBar.setWindowModality(Qt.WindowModality.NonModal)
+                self.progressBar.setWindowModality(Qt.WindowModality.ApplicationModal)
                 self.progressBar.show()
 
                 self.generalUiWorker = GeneralUiWorker(svc, self.progressBar)
@@ -422,6 +425,7 @@ class PyPzWindows(QMainWindow):
             ],
             [
                 (f'💳 福慧卡製作', self.generate_qrcode),
+                (f'🎨 福慧卡樣版', self.show_qrcode_template),
             ],
             [
                 ('🔼 切換成完整版', self.change_to_full_layout),

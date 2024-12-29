@@ -33,9 +33,9 @@ def generate_qrcode(cfg: PzProjectConfig, excel_file: str):
         if record.realName is not None and record.realName != '':
             class_folder = f'{cfg.output_folder}/{record.className}'
             if not os.path.exists(class_folder):
-                os.makedirs(class_folder)
+                os.makedirs(class_folder, exist_ok=True)
             group_folder = f'{class_folder}/{record.groupId}'
             if not os.path.exists(group_folder):
-                os.makedirs(group_folder)
+                os.makedirs(group_folder, exist_ok=True)
             png_file = f'{group_folder}/{record.realName}_{record.studentId}.png'
-            qrcode_service.create_qrcode(str(record.studentId), record.realName, png_file)
+            qrcode_service.create_qrcode(str(record.studentId), record.realName.strip(), png_file)
