@@ -75,6 +75,14 @@ def get_formatted_datetime() -> str:
     return formatted_date_time
 
 
+def format_phone_number(phone_number: int) -> str:
+    phone_number_str = str(phone_number)
+
+    if len(phone_number_str) != 9:
+        return phone_number_str
+    return f"0{phone_number_str[:3]}-{phone_number_str[3:]}"
+
+
 def normalize_phone_number(phone_number: str) -> tuple[str | None, bool]:
     if phone_number is None:
         return None, False

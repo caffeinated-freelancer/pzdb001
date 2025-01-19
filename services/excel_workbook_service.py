@@ -15,6 +15,7 @@ from openpyxl.worksheet.pagebreak import Break
 from openpyxl.worksheet.worksheet import Worksheet
 
 from pz.models.excel_model import ExcelModelInterface
+from pz.utils import format_phone_number
 
 
 class PzCellProperties:
@@ -190,6 +191,17 @@ class ExcelWorkbookService:
                     value = cell.value
                     if isinstance(value, str):
                         item[self.headers_rev[colNum]] = value.strip()
+                    elif isinstance(value, int):
+                        item[self.headers_rev[colNum]] = value
+
+                        if cell.has_style:
+                            number_format = cell.number_format
+                            if number_format is not None:
+                                if number_format == r'0000\-000000':
+                                    item[self.headers_rev[colNum]] = format_phone_number(value)
+                                elif number_format != 'General':
+                                    logger.warning(f'[第 {rowNum} 列, 第 {colNum} 行] 本程式不支援此儲存格格式: {number_format}')
+                                    item[self.headers_rev[colNum]] = str(value)
                     else:
                         item[self.headers_rev[colNum]] = value
 

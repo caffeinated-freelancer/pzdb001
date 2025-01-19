@@ -126,7 +126,9 @@ def generate_introducer_report(member_service: PzGrandMemberService, cfg: PzProj
             continue
 
         phone_list = [entry.mobilePhone, entry.parentsPhone, entry.homePhone]
+        logger.trace(phone_list)
         phones = list(OrderedDict.fromkeys(item for item in phone_list if item))
+        logger.trace(phones)
 
         have_register_class = entry.registerClass is not None and entry.registerClass != ''
 
@@ -205,5 +207,6 @@ def generate_introducer_reports(cfg: PzProjectConfig):
                     generate_introducer_report(member_service, cfg, filename)
                 except Exception as e:
                     logger.warning(f'{filename} - {e}')
+                    logger.exception(e)
     else:
         generate_introducer_report(member_service, cfg, cfg.excel.questionnaire.spreadsheet_file)
