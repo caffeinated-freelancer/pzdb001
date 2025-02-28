@@ -236,6 +236,8 @@ class PzProjectQrCodeConfig(PzProjectBaseConfig):
     id_coordinate: str
     text_size: int
     id_size: int
+    dharma_name_y_axis: int
+    dharma_name_size: int
 
     def __init__(self, variables: dict[str, Any]) -> None:
         super().__init__(variables)

@@ -214,19 +214,22 @@ excel:
         - "S1 <= 6"
 
 qrcode:
-  template_file: '{WORKSPACE}\福慧卡樣版.png'
+  template_file: '{WORKSPACE}\福慧卡樣板.png'
   # QR Code 每格的大小
   qrcode_box: 13
   # QR Code 邊界要留幾格 (建議 2)
   qrcode_border: 2
   # QR Code 水平會置中於樣版, Y 軸則需要指定
-  qrcode_y_axis: 440
+  qrcode_y_axis: 430
   # 文字一般是放學員姓名，也會水平置中，文字所在 Y 軸則需要指定
-  text_y_axis: 815
+  text_y_axis: 760
   # 文字使用的字型．標楷體: 'kaiu.tf', 微軟雅黑: 'msyh.ttc', 微軟正黑體: 'msjh.ttc'
   font_ttf: 'kaiu.ttf'
   # 文字的字體大小
-  text_size: 84
+  text_size: 96
+  # 法名
+  dharma_name_y_axis: 870
+  dharma_name_size: 72
   # 學號不會預設置中，分別要指字 x 座標及 y 座楆。用逗號區隔，如: 468, 1024
   id_coordinate: 468, 1004
   # 學號的字體大小 (字型寫在程式碼裡, 不提供調整)

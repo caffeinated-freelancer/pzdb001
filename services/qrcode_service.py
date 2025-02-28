@@ -11,7 +11,7 @@ class QRCodeService:
     def __init__(self, cfg: PzProjectConfig):
         self.config = cfg
 
-    def create_qrcode(self, student_id: str, text: str, output_file: str):
+    def create_qrcode(self, student_id: str, text: str, dharma_name: str | None, output_file: str):
         settings = self.config.qrcode
         # Data to encode
 
@@ -39,17 +39,18 @@ class QRCodeService:
             id_font = ImageFont.load_default()
         try:
             font = ImageFont.truetype(settings.font_ttf, settings.text_size)
+            dharma_font = ImageFont.truetype(settings.font_ttf, settings.dharma_name_size)
         except IOError:
             raise Exception("Font file not found. Please provide a valid Chinese font.")
 
         # Calculate text size using getbbox
         text_bbox = font.getbbox(text)
         text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
+        # text_height = text_bbox[3] - text_bbox[1]
 
         qr_width, qr_height = qr_image.size
-        canvas_width = qr_width
-        canvas_height = qr_height + text_height + 10  # Add some padding
+        # canvas_width = qr_width
+        # canvas_height = qr_height + text_height + 10  # Add some padding
 
         canvas = Image.open(settings.template_file)
         canvas_width, canvas_height = canvas.size
@@ -72,6 +73,13 @@ class QRCodeService:
         text_y = settings.text_y_axis
 
         draw.text((text_x, text_y), text, fill="black", font=font)
+
+        if dharma_name is not None and dharma_name != '':
+            dharma_bbox = dharma_font.getbbox(dharma_name)
+            dharma_width = dharma_bbox[2] - dharma_bbox[0]
+            dharma_x = (canvas_width - dharma_width) // 2
+            draw.text((dharma_x, settings.dharma_name_y_axis), dharma_name, fill="black", font=dharma_font)
+
         xx, yy = [int(x) for x in settings.id_coordinate.split(',', 2)]
         draw.text((xx, yy), student_id, fill="black", font=id_font)
 
