@@ -4,6 +4,7 @@ from loguru import logger
 
 from pz.cloud.spreadsheet import SpreadsheetValueWithFormula
 from pz.models.google_spreadsheet_model import GoogleSpreadSheetModelInterface
+from pz.models.special_deacon import SpecialDeacon
 from pz.utils import full_name_to_real_name
 
 
@@ -20,6 +21,7 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
         'gender': '性別',
         'senior': '學長',
         'deacon': '執事',
+        'notes': '調查備註',
         'nextClasses': ['上課班別', '第二班'],
     }
     # VARIABLE_LOCATIONS = [key for key in VARIABLE_MAP.keys()]
@@ -35,10 +37,17 @@ class GoogleClassMemberModel(GoogleSpreadSheetModelInterface):
     gender: str
     senior: str
     deacon: str
+    notes: str | None
     nextClasses: list[str]
 
     # transit
     recordOrder: int | None
+    deaconOrder: int | None
+    isSenior: bool | None
+
+    # is_senior: bool
+    # some_kind_of_senior: bool
+    # special_deacon: SpecialDeacon | None
 
     @classmethod
     def remap_variables(cls, new_mapping: dict[str, str | list[str]] | None):

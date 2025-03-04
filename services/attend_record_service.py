@@ -5,6 +5,7 @@ import re
 
 from loguru import logger
 
+from pz.comparators import google_class_member_comparator
 from pz.config import PzProjectConfig
 from pz.models.attend_record import AttendRecord
 from pz.models.google_class_member import GoogleClassMemberModel
@@ -170,19 +171,62 @@ class AttendRecordAsClassMemberService:
             if class_name in class_members:
                 models.extend(class_members[class_name])
 
+        attend_by_student_id: dict[str, list[GoogleClassMemberModel]] = {}
+
+        logger.error(self.config.deacon_order)
+
         for model in models:
+            model.deaconOrder = len(self.config.deacon_order) + 2
+            model.isSenior = False
+            model.notes = None
+
             key = f'{model.className}_{model.classGroup}_{model.fullName}_{model.dharmaName}'
             if key in deacon_service.senior_deacons:
                 entry = deacon_service.senior_deacons.pop(key)
 
+                my_deacon: str | None = None
+
                 if entry.deacon is not None and entry.deacon != '':
-                    model.deacon = entry.deacon
+                    my_deacon = entry.deacon
                 elif entry.senior is not None and entry.senior != '':
-                    model.deacon = entry.senior
+                    my_deacon = entry.senior
+
+                if my_deacon is not None:
+                    model.deacon = my_deacon
+                    model.isSenior = True
+                    try:
+                        model.deaconOrder = self.config.deacon_order.index(my_deacon)
+                    except ValueError:
+                        model.deaconOrder = len(self.config.deacon_order) + 1
 
             key = f'{model.className}_{model.classGroup}'
             if key in deacon_service.class_senior:
                 model.senior = deacon_service.class_senior[key].fullName
+
+            if model.studentId is not None and model.studentId != '':
+                if model.studentId in attend_by_student_id:
+                    attend_by_student_id[model.studentId].append(model)
+                else:
+                    attend_by_student_id[model.studentId] = [model]
+
+        for student_id in attend_by_student_id:
+            entries = attend_by_student_id[student_id]
+            if len(entries) > 1:
+                sorted_list = sorted(entries, key=functools.cmp_to_key(google_class_member_comparator))
+                sorted_list[0].notes = '本班回報'
+                for i in range(1, len(sorted_list)):
+                    sorted_list[i].notes = f'上多班;請回報在{sorted_list[0].className}{sorted_list[0].classGroup}'
+                logger.error(f'Student ID {student_id} has multiple attend records')
+                for entry in sorted_list:
+                    logger.warning(
+                        f'{entry.className} {entry.classGroup} {entry.fullName} {entry.dharmaName} {entry.deacon} {entry.deaconOrder} {entry.notes}')
+
+        attend_by_student_id.clear()
+
+        # model.notes = ''
+
+        # model.notes = '本班回報'
+        # model.notes = '上多班;請回報在夜研5'
 
         logger.info(deacon_service.senior_deacons)
 
@@ -214,6 +258,7 @@ def senior_first_comparator(a: GoogleClassMemberModel, b: GoogleClassMemberModel
             return int(a.classGroup) - int(b.classGroup)
     else:
         return class_names.index(a.className) - class_names.index(b.className)
+
 
 def trivial_comparator(a: GoogleClassMemberModel, b: GoogleClassMemberModel, class_names: list[str]) -> int:
     if a.className == b.className:

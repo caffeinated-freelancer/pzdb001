@@ -21,8 +21,10 @@ def from_attend_records_to_class(cfg: PzProjectConfig):
     # senior_service.
 
     # for model in models:
+    #     # print(
+    #     #     f'{model.className} {model.classGroup} {model.sn} {model.studentId} {model.realName} {model.dharmaName} {model.gender}')
     #     print(
-    #         f'{model.className} {model.classGroup} {model.sn} {model.studentId} {model.realName} {model.dharmaName} {model.gender}')
+    #         f'{model.className} {model.classGroup} {model.sn} {model.studentId} {model.realName} {model.deacon} {model.senior}')
 
     if len(models) > 0:
         remap_if_possible(cfg)

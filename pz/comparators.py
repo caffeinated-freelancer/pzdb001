@@ -1,3 +1,4 @@
+from pz.models.google_class_member import GoogleClassMemberModel
 from pz.models.mysql_class_member_entity import MysqlClassMemberEntity
 from pz.models.mysql_member_detail_entity import MysqlMemberDetailEntity
 from pz.models.new_class_senior import NewClassSeniorModel
@@ -57,3 +58,12 @@ def new_class_senior_comparator(model: NewClassSeniorModel):
         return len(model.members) * 1000 + model.groupId
     else:
         return len(model.members) * 1000 + 999
+
+
+def google_class_member_comparator(a: GoogleClassMemberModel, b: GoogleClassMemberModel) -> int:
+    if a.deaconOrder != b.deaconOrder:
+        return a.deaconOrder - b.deaconOrder
+    else:
+        ranking_a = class_name_ranking(a.className, a.isSenior)
+        ranking_b = class_name_ranking(b.className, b.isSenior)
+        return ranking_b - ranking_a
