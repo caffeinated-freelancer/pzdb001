@@ -66,4 +66,8 @@ def google_class_member_comparator(a: GoogleClassMemberModel, b: GoogleClassMemb
     else:
         ranking_a = class_name_ranking(a.className, a.isSenior)
         ranking_b = class_name_ranking(b.className, b.isSenior)
-        return ranking_b - ranking_a
+
+        # return ranking_b - ranking_a
+
+        ranking = ranking_b - ranking_a
+        return -ranking if a.isSenior else ranking

@@ -46,14 +46,17 @@ class PzCloudSpreadsheetMemberService:
             spreadsheet_title, model.get_column_names(),
             header_row=self.settings.header_row, read_formula=check_formula, reverse_index=False)
 
-        # logger.warning(f'{results}')
-        entries: list[GoogleSpreadSheetModelInterface] = []
-        for result in results:
-            model = GoogleClassMemberModel([], raw_values=result)
-            if model.realName is not None and len(model.realName) > 0:
-                logger.trace(f'{result}')
-                entries.append(model)
-        return entries
+        if results is None:
+            logger.error(f'   >>> {spreadsheet_title} 沒有資料')
+            return []
+        else:
+            entries: list[GoogleSpreadSheetModelInterface] = []
+            for result in results:
+                model = GoogleClassMemberModel([], raw_values=result)
+                if model.realName is not None and len(model.realName) > 0:
+                    logger.trace(f'{result}')
+                    entries.append(model)
+            return entries
 
     def clear_all(self, model: GoogleSpreadSheetModelInterface):
         self.service.clear_sheet_data(

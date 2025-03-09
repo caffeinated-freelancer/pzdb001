@@ -127,6 +127,7 @@ def activity_survey(cfg: PzProjectConfig):
                     entry['性別'] = member.gender
                     entry['groupId'] = member.class_group
                     entry['執事'] = deacon_service.find_deacon(class_name, member.class_group, member)
+                    entry['調查備註'] = member.notes
 
                     if member.have_detail:
                         entry[dharma_protector_header] = member.dharma_protection_position

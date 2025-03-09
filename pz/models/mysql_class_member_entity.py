@@ -17,6 +17,7 @@ class MysqlClassMemberEntity(JSONClass):
     deacon: str
     gender: str
     next_classes: str
+    notes: str
     updated_at: str
 
     is_senior: bool
@@ -34,6 +35,7 @@ class MysqlClassMemberEntity(JSONClass):
         'next_classes': 'nextClasses',
         'senior': 'senior',
         'deacon': 'deacon',
+        'notes': 'notes',
     }
 
     ACCESS_DB_MAP: dict[str, tuple[str, str]] = {
@@ -45,6 +47,7 @@ class MysqlClassMemberEntity(JSONClass):
         'gender': ('Gender', 'TEXT(1)'),
         'senior': ('Senior', 'TEXT(10)'),
         'deacon': ('Deacon', 'TEXT(20)'),
+        'notes': ('Notes', 'TEXT(64)'),
     }
 
     @staticmethod
@@ -56,6 +59,7 @@ class MysqlClassMemberEntity(JSONClass):
                  another_entity: 'MysqlClassMemberEntity' = None) -> None:
         self.is_senior = False
         self.special_deacon = None
+        self.notes = ''
 
         if another_entity is not None:
             for k, v in another_entity.__dict__.items():

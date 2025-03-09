@@ -11,6 +11,7 @@ class ActivitySurveyModel(ExcelModelInterface):
         'className': '班級',
         'groupId': '組別',
         'dharmaProtector': '護法會',
+        'notes': '調查備註',
     }
 
     no: int
@@ -20,6 +21,7 @@ class ActivitySurveyModel(ExcelModelInterface):
     gender: str
     groupId: int
     dharmaProtector: str
+    notes: str
 
     def __init__(self, values: dict[str, str]):
         super().__init__()
